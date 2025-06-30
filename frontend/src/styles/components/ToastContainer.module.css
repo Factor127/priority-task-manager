@@ -1,0 +1,26 @@
+/* src/styles/components/ToastContainer.module.css */
+
+.container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.toastWrapper {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  pointer-events: auto;
+  transition: top 0.3s ease-in-out;
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .toastWrapper {
+    right: 10px;
+    left: 10px;
+    top: 10px;
+  }
+}

@@ -1,0 +1,331 @@
+/* src/styles/components/Header.module.css - Updated with AutosaveIndicator integration */
+
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: 1fr auto auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Logo Section */
+.logoSection {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.emoji {
+  font-size: 24px;
+}
+
+.title {
+  white-space: nowrap;
+}
+
+/* User Stats Section */
+.statsSection {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.levelBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.levelLabel {
+  font-size: 10px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.levelValue {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.pointsBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.pointsValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #a7f3d0;
+  line-height: 1;
+}
+
+.pointsLabel {
+  font-size: 10px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+/* Autosave Section */
+.autosaveSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.autosaveIndicator {
+  /* AutosaveIndicator component has its own styling */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Actions Section */
+.actionsSection {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+.actionButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.actionButton:active {
+  transform: translateY(0);
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primaryButton {
+  background: rgba(34, 197, 94, 0.9);
+  border-color: rgba(34, 197, 94, 1);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 1);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.saveButton {
+  background: rgba(59, 130, 246, 0.9);
+  border-color: rgba(59, 130, 246, 1);
+}
+
+.saveButton:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.buttonText {
+  /* Always visible */
+}
+
+.buttonTextDesktop {
+  /* Hidden on mobile, visible on desktop */
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .container {
+    grid-template-columns: 1fr auto auto auto;
+    gap: 12px;
+  }
+  
+  .title {
+    display: none;
+  }
+  
+  .emoji {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    padding: 0 12px;
+  }
+  
+  .logoSection {
+    order: 1;
+  }
+  
+  .statsSection {
+    order: 3;
+    gap: 8px;
+  }
+  
+  .autosaveSection {
+    order: 2;
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .actionsSection {
+    order: 4;
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+  }
+  
+  .actionButton {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    padding: 12px;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .buttonText,
+  .buttonTextDesktop {
+    display: none;
+  }
+  
+  .levelBadge,
+  .pointsBadge {
+    padding: 4px 8px;
+    min-width: 60px;
+  }
+  
+  .levelValue {
+    font-size: 14px;
+  }
+  
+  .pointsValue {
+    font-size: 12px;
+  }
+  
+  .levelLabel,
+  .pointsLabel {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 8px 0;
+  }
+  
+  .container {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  
+  .statsSection {
+    gap: 6px;
+  }
+  
+  .levelBadge,
+  .pointsBadge {
+    padding: 3px 6px;
+    min-width: 50px;
+  }
+  
+  .actionButton {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .actionsSection {
+    bottom: 12px;
+    right: 12px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .header {
+    background: #000000;
+    border-bottom: 2px solid #ffffff;
+  }
+  
+  .actionButton {
+    background: #ffffff;
+    color: #000000;
+    border-color: #000000;
+  }
+  
+  .levelBadge,
+  .pointsBadge {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #ffffff;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .actionButton {
+    transition: none;
+  }
+  
+  .actionButton:hover:not(:disabled) {
+    transform: none;
+  }
+}

@@ -7,8 +7,8 @@ export const useTaskManager = () => {
         tasks, 
         setTasks, 
         priorityCategories,
-        userProgress, 
-        setUserProgress
+        
+        //setUserProgress
     } = useApp();
 
     // Create a new task
@@ -52,21 +52,20 @@ export const useTaskManager = () => {
             });
             
             const points = Math.round(calculatePriorityScore(updatedTask, priorityCategories, priorityWeights) * 10);
-            const newPoints = userProgress.points + points;
+            const newPoints = 0 + points;
             const newLevel = Math.floor(newPoints / 1000) + 1;
             
-            setUserProgress(prev => ({
-                ...prev,
-                points: newPoints,
-                level: newLevel
-            }));
+            //setUserProgress(prev => ({
+            //    ...prev,
+            //    points: newPoints,
+            //    level: newLevel
+            //}));
             
             return `Task completed! +${points} points`;
         }
         
         return null;
-    }, [tasks, setTasks, priorityCategories, userProgress, setUserProgress]);
-
+    }, [tasks, setTasks, priorityCategories]);
     // Delete task
     const handleDeleteTask = useCallback((taskId) => {
         if (window.confirm('Are you sure you want to delete this task?')) {

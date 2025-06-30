@@ -1,0 +1,261 @@
+/* App.module.css */
+
+/* Main App Container */
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  color: #111827;
+  line-height: 1.6;
+}
+
+/* Main Content Area */
+.mainContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem 2rem 2rem;
+  position: relative;
+}
+
+/* Global Scrollbar Styling */
+.app ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.app ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.app ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.app ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Ensure proper scrollbar for Firefox */
+.app {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Loading States */
+.app[data-loading="true"] {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.app[data-loading="true"]::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 1024px) {
+  .mainContent {
+    padding: 0 1.5rem 2rem 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .mainContent {
+    padding: 0 1rem 1.5rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .mainContent {
+    padding: 0 0.75rem 1rem 0.75rem;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .app {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9;
+  }
+
+  .app ::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+
+  .app ::-webkit-scrollbar-thumb {
+    background: #475569;
+  }
+
+  .app ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  .app {
+    scrollbar-color: #475569 #1e293b;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .app {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .app ::-webkit-scrollbar-track {
+    background: #ffffff;
+    border: 1px solid #000000;
+  }
+
+  .app ::-webkit-scrollbar-thumb {
+    background: #000000;
+    border: 1px solid #ffffff;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .app * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .app {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .mainContent {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* Hide interactive elements when printing */
+  .app button,
+  .app input,
+  .app select {
+    display: none;
+  }
+}
+
+/* Focus Management */
+.app:focus-within {
+  /* Enhance focus visibility when any element is focused */
+}
+
+/* Keyboard Navigation Support */
+.app [tabindex="-1"]:focus {
+  outline: none;
+}
+
+.app [role="button"]:focus,
+.app button:focus,
+.app input:focus,
+.app select:focus,
+.app textarea:focus {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Selection Styling */
+.app ::selection {
+  background-color: #4f46e5;
+  color: #ffffff;
+}
+
+.app ::-moz-selection {
+  background-color: #4f46e5;
+  color: #ffffff;
+}
+
+/* Error Boundary Styles */
+.app .error-boundary {
+  padding: 2rem;
+  text-align: center;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  margin: 2rem;
+}
+
+.app .error-boundary h2 {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.app .error-boundary p {
+  color: #7f1d1d;
+  margin-bottom: 1rem;
+}
+
+/* Accessibility Improvements */
+@media (prefers-reduced-motion: no-preference) {
+  .app {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Text readability */
+.app {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure minimum touch targets on mobile */
+@media (max-width: 768px) {
+  .app button,
+  .app [role="button"],
+  .app input,
+  .app select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Layout stability */
+.app {
+  overflow-x: hidden;
+}
+
+.mainContent {
+  contain: layout style;
+}
+
+/* Performance optimizations */
+.app * {
+  box-sizing: border-box;
+}
+
+.app img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 768px) {
+  .app {
+    overflow-x: hidden;
+    width: 100vw;
+  }
+  
+  .mainContent {
+    width: 100%;
+    overflow-x: hidden;
+  }
+}

@@ -1,327 +1,727 @@
-import React, { useState } from 'react';
-import { AppProvider, useApp } from './context/AppContext';
-import './styles/globals.css';
+// TaskForm.jsx - Fixed syntax errors and CSS imports
+import React, { useState, useEffect } from 'react';
+import { X, Star, Save, Plus } from 'lucide-react';
+import TaskField from './ui/TaskField';
+import App from './App';
+// import styles from './TaskForm.module.css'; // Comment out if CSS module doesn't exist
 
-// Header Component
-const Header = ({ onCreateTask, onShowFiles, onShowSettings, onForceSave }) => {
-    const { userProgress } = useApp();
+const TaskForm = ({
+  isOpen = false,
+  onClose,
+  onSubmit,
+  onRatePriority,
+  task = null, // null for new task, task object for editing
+  savedProjects = [],
+  priorityCategories = [],
+  className = ''
+}) => {
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    project: '',
+    goal: '',
+    update: '',
+    type: '',
+    status: 'לא התחיל',
+    dueDate: '',
+    isRepeating: false,
+    repeatInterval: '',
+    link: '',
+    priorityRatings: {}
+  });
 
-    const headerStyle = {
-        background: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '15px'
-    };
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPrioritySection, setShowPrioritySection] = useState(false);
 
-    const logoStyle = {
-        fontSize: '24px',
-        fontWeight: 'bold',
-        color: '#4f46e5'
-    };
+  // Initialize form data when task prop changes
+  useEffect(() => {
+    if (task) {
+      // Editing existing task
+      setFormData({
+        title: task.title || '',
+        project: task.project || '',
+        goal: task.goal || '',
+        update: task.update || '',
+        type: task.type || '',
+        status: task.status || 'לא התחיל',
+        dueDate: task.dueDate || '',
+        isRepeating: task.isRepeating || false,
+        repeatInterval: task.repeatInterval || '',
+        link: task.link || '',
+        priorityRatings: task.priorityRatings || {}
+      });
+      setShowPrioritySection(Object.keys(task.priorityRatings || {}).length > 0);
+    } else {
+      // New task - reset form
+      setFormData({
+        title: '',
+        project: '',
+        goal: '',
+        update: '',
+        type: '',
+        status: 'לא התחיל',
+        dueDate: '',
+        isRepeating: false,
+        repeatInterval: '',
+        link: '',
+        priorityRatings: {}
+      });
+      setShowPrioritySection(false);
+    }
+    setErrors({});
+  }, [task, isOpen]);
 
-    const userStatsStyle = {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '20px',
-        flexWrap: 'wrap'
-    };
+  // Calculate priority score
+  const calculatePriorityScore = () => {
+    let score = 0;
+    priorityCategories.forEach(category => {
+      const rating = formData.priorityRatings[category.id] || 0;
+      const weight = category.weight || 0;
+      score += (rating * weight) / 100;
+    });
 
-    const levelBadgeStyle = {
-        background: 'linear-gradient(45deg, #4f46e5, #10b981)',
-        color: 'white',
-        padding: '8px 16px',
-        borderRadius: '20px',
-        fontWeight: 'bold'
-    };
+    // Add urgency bonus for due date
+    if (formData.dueDate) {
+      const today = new Date();
+      const dueDate = new Date(formData.dueDate);
+      const diffTime = dueDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    const pointsStyle = {
-        color: '#10b981',
-        fontWeight: '600'
-    };
+      if (diffDays <= 0) {
+        score += 50; // Overdue or due today
+      } else if (diffDays <= 3) {
+        score += 30; // Due in 1-3 days
+      } else if (diffDays <= 7) {
+        score += 15; // Due in 4-7 days
+      }
+    }
 
-    const buttonStyle = {
-        padding: '10px 16px',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: '500',
-        transition: 'all 0.2s ease'
-    };
-
-    const primaryButtonStyle = {
-        ...buttonStyle,
-        background: '#4f46e5',
-        color: 'white'
-    };
-
-    const secondaryButtonStyle = {
-        ...buttonStyle,
-        background: '#f3f4f6',
-        color: '#374151'
-    };
-
-    return (
-        <header style={headerStyle}>
-            <div style={logoStyle}>🎯 Priority Task Manager</div>
-            
-            <div style={userStatsStyle}>
-                <div style={levelBadgeStyle}>Level {userProgress.level}</div>
-                <div style={pointsStyle}>{userProgress.points} points</div>
-                <div style={{ 
-                    fontSize: '12px', 
-                    color: '#6b7280',
-                    background: '#f9fafb',
-                    padding: '4px 8px',
-                    borderRadius: '12px',
-                    border: '1px solid #e5e7eb'
-                }}>
-                    Auto-save Ready
-                </div>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <button style={primaryButtonStyle} onClick={onCreateTask}>
-                    + New Task
-                </button>
-                <button style={secondaryButtonStyle} onClick={onShowFiles}>
-                    📁 Files
-                </button>
-                <button style={secondaryButtonStyle} onClick={onShowSettings}>
-                    ⚙️ Settings
-                </button>
-                <button style={secondaryButtonStyle} onClick={onForceSave}>
-                    💾 Save Now
-                </button>
-            </div>
-        </header>
-    );
-};
-
-// Empty State Component
-const EmptyState = ({ taskCount, onCreateTask }) => {
-    const emptyStateStyle = {
-        textAlign: 'center',
-        padding: '60px 20px',
-        color: '#6b7280'
-    };
-
-    const titleStyle = {
-        fontSize: '20px',
-        marginBottom: '10px',
-        color: '#374151'
-    };
-
-    const textStyle = {
-        fontSize: '16px',
-        marginBottom: '20px'
-    };
-
-    const tipStyle = {
-        fontSize: '14px',
-        color: '#9ca3af',
-        marginTop: '10px'
-    };
-
-    const subtipStyle = {
-        fontSize: '12px',
-        color: '#6b7280',
-        marginTop: '5px'
-    };
-
-    const createBtnStyle = {
-        padding: '10px 16px',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: '500',
-        background: '#4f46e5',
-        color: 'white',
-        transition: 'all 0.2s ease',
-        marginTop: '10px'
-    };
-
-    return (
-        <div style={emptyStateStyle}>
-            <h3 style={titleStyle}>No tasks found</h3>
-            <p style={textStyle}>
-                {taskCount === 0 
-                    ? "Get started by creating your first task!"
-                    : "Try adjusting your search or filters."
-                }
-            </p>
-            <p style={tipStyle}>
-                💡 Tip: Click on any task to expand and edit it inline
-            </p>
-            <p style={subtipStyle}>
-                🔄 Auto-save is enabled - your changes are saved automatically
-            </p>
-            {taskCount === 0 && (
-                <button style={createBtnStyle} onClick={onCreateTask}>
-                    Create Your First Task
-                </button>
-            )}
-        </div>
-    );
-};
-
-// Main component that uses the context
-const PriorityTaskManager = () => {
-  const { tasks, userProgress, setTasks, setUserProgress, priorityCategories } = useApp();
-  
-  const [toast, setToast] = useState({ show: false, message: '' });
-
-  const showToast = (message) => {
-    setToast({ show: true, message });
-    setTimeout(() => setToast({ show: false, message: '' }), 3000);
+    return Math.round(score * 10) / 10;
   };
 
-  const handleCreateTask = () => {
-    const newTask = {
-      id: Date.now(),
-      title: `Sample Task ${tasks.length + 1}`,
-      project: 'Test Project',
-      goal: 'This is a test task to verify everything works',
-      type: 'מנהלה',
-      status: 'לא התחיל',
-      priorityRatings: { income: 3, home: 2, personal: 4 },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      completedAt: null
-    };
-    
-    setTasks(prev => [...prev, newTask]);
-    showToast(`Task "${newTask.title}" created successfully!`);
-  };
+  // Handle field changes
+  const handleFieldChange = (value, fieldName) => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
 
-  const handleCompleteTask = (taskId) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    const updatedTask = {
-      ...task,
-      status: task.status === 'הושלם' ? 'בעבודה' : 'הושלם',
-      completedAt: task.status === 'הושלם' ? null : new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-
-    if (updatedTask.status === 'הושלם') {
-      const points = 25; // Simple points for now
-      setUserProgress(prev => ({
+    // Clear error when user starts typing
+    if (errors[fieldName]) {
+      setErrors(prev => ({
         ...prev,
-        points: prev.points + points,
-        level: Math.floor((prev.points + points) / 1000) + 1
+        [fieldName]: ''
       }));
-      showToast(`Task completed! +${points} points`);
     }
   };
 
-  return (
-    <div className="app">
-      <Header
-        onCreateTask={handleCreateTask}
-        onShowFiles={() => showToast('Files coming in Phase 2!')}
-        onShowSettings={() => showToast('Settings coming in Phase 2!')}
-        onForceSave={() => showToast('Save coming in Phase 2!')}
-      />
+  // Handle priority rating changes
+  const handlePriorityRatingChange = (categoryId, rating) => {
+    setFormData(prev => ({
+      ...prev,
+      priorityRatings: {
+        ...prev.priorityRatings,
+        [categoryId]: rating
+      }
+    }));
+  };
 
-      <main className="main-content">
-        {tasks.length === 0 ? (
-          <EmptyState taskCount={tasks.length} onCreateTask={handleCreateTask} />
-        ) : (
-          <div style={{ 
-            background: 'white', 
-            borderRadius: '12px', 
-            padding: '20px', 
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' 
-          }}>
-            <h3>📋 Your Tasks ({tasks.length})</h3>
-            {tasks.map(task => (
-              <div key={task.id} style={{
-                background: '#f9fafb',
-                borderRadius: '8px',
-                padding: '15px',
-                margin: '10px 0',
-                borderLeft: '4px solid #10b981'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <div>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#1f2937' }}>{task.title}</h4>
-                    <p style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#6b7280' }}>
-                      Project: {task.project} | Status: {task.status}
-                    </p>
-                    <p style={{ margin: '0', fontSize: '14px', color: '#374151' }}>{task.goal}</p>
-                  </div>
-                  <button 
-                    onClick={() => handleCompleteTask(task.id)}
-                    style={{
-                      padding: '6px 12px',
-                      border: 'none',
-                      borderRadius: '4px',
-                      background: task.status === 'הושלם' ? '#10b981' : '#4f46e5',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Required fields
+    if (!formData.title.trim()) {
+      newErrors.title = 'Task title is required';
+    }
+
+    // URL validation
+    if (formData.link && !isValidUrl(formData.link)) {
+      newErrors.link = 'Please enter a valid URL';
+    }
+
+    // Repeat interval validation
+    if (formData.isRepeating && !formData.repeatInterval) {
+      newErrors.repeatInterval = 'Repeat interval is required for repeating tasks';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Simple URL validation
+  const isValidUrl = (string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const taskData = {
+        ...formData,
+        // Convert date string to proper format
+        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+        // Ensure proper data types
+        isRepeating: Boolean(formData.isRepeating),
+        // Add timestamps
+        updatedAt: new Date().toISOString(),
+        ...(task ? {} : { createdAt: new Date().toISOString() }) // Only add createdAt for new tasks
+      };
+
+      await onSubmit(taskData);
+      handleClose();
+    } catch (error) {
+      console.error('Error submitting task:', error);
+      setErrors({ submit: 'Failed to save task. Please try again.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle close
+  const handleClose = () => {
+    if (!isSubmitting) {
+      onClose();
+    }
+  };
+
+  // Handle ESC key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden'; // Prevent background scroll
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  // Handle priority rating button
+  const handleRatePriority = () => {
+    if (onRatePriority) {
+      onRatePriority(formData);
+    } else {
+      setShowPrioritySection(true);
+    }
+  };
+
+  // Get priority score for display
+  const priorityScore = calculatePriorityScore();
+
+  // Inline styles (use these if CSS module doesn't exist)
+  const modalStyles = {
+    overlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    },
+    modal: {
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '0',
+      maxWidth: '600px',
+      width: '90%',
+      maxHeight: '90vh',
+      overflow: 'hidden',
+      boxShadow: '0 20px 25px rgba(0, 0, 0, 0.3)'
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '20px',
+      borderBottom: '1px solid #e5e7eb'
+    },
+    title: {
+      margin: 0,
+      fontSize: '18px',
+      fontWeight: '600',
+      color: '#1f2937'
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      borderRadius: '4px',
+      color: '#6b7280'
+    },
+    form: {
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%'
+    },
+    formContent: {
+      padding: '20px',
+      overflowY: 'auto',
+      flex: 1
+    },
+    section: {
+      marginBottom: '20px'
+    },
+    twoColumnRow: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '15px',
+      marginBottom: '20px'
+    },
+    checkboxRow: {
+      marginBottom: '15px'
+    },
+    checkboxLabel: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '500'
+    },
+    prioritySection: {
+      marginBottom: '20px'
+    },
+    priorityHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '15px'
+    },
+    priorityTitle: {
+      margin: 0,
+      fontSize: '16px',
+      fontWeight: '600'
+    },
+    priorityActions: {
+      display: 'flex',
+      gap: '10px',
+      alignItems: 'center'
+    },
+    priorityScore: {
+      fontSize: '14px',
+      color: '#6b7280'
+    },
+    scoreValue: {
+      fontWeight: '600',
+      color: '#4f46e5'
+    },
+    ratePriorityBtn: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      padding: '6px 12px',
+      background: '#4f46e5',
+      color: 'white',
+      border: 'none',
+      borderRadius: '6px',
+      fontSize: '12px',
+      cursor: 'pointer'
+    },
+    showPriorityBtn: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      padding: '6px 12px',
+      background: '#f3f4f6',
+      color: '#374151',
+      border: 'none',
+      borderRadius: '6px',
+      fontSize: '12px',
+      cursor: 'pointer'
+    },
+    priorityRatings: {
+      background: '#f9fafb',
+      padding: '15px',
+      borderRadius: '8px',
+      border: '1px solid #e5e7eb'
+    },
+    priorityCategory: {
+      marginBottom: '15px'
+    },
+    categoryInfo: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '8px'
+    },
+    categoryName: {
+      fontSize: '14px',
+      fontWeight: '500'
+    },
+    categoryWeight: {
+      fontSize: '12px',
+      color: '#6b7280'
+    },
+    ratingSlider: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    },
+    slider: {
+      flex: 1,
+      height: '6px',
+      borderRadius: '3px',
+      outline: 'none',
+      cursor: 'pointer'
+    },
+    ratingValue: {
+      fontSize: '12px',
+      fontWeight: '600',
+      color: '#374151',
+      minWidth: '35px'
+    },
+    priorityTotal: {
+      textAlign: 'center',
+      padding: '10px',
+      background: '#eff6ff',
+      borderRadius: '6px',
+      marginTop: '10px'
+    },
+    submitError: {
+      color: '#dc2626',
+      fontSize: '14px',
+      padding: '10px',
+      background: '#fef2f2',
+      border: '1px solid #fecaca',
+      borderRadius: '6px',
+      marginTop: '15px'
+    },
+    footer: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: '10px',
+      padding: '20px',
+      borderTop: '1px solid #e5e7eb'
+    },
+    cancelButton: {
+      padding: '8px 16px',
+      background: '#f3f4f6',
+      color: '#374151',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontSize: '14px'
+    },
+    submitButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '8px 16px',
+      background: '#4f46e5',
+      color: 'white',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '500'
+    }
+  };
+
+  // Use either styles (CSS modules) or modalStyles (inline)
+  const s = typeof styles !== 'undefined' ? styles : modalStyles;
+  if (!isOpen) return null;
+
+  return (
+    <div style={s.overlay} onClick={handleClose}>
+      <div 
+        style={{...s.modal, ...(className ? {} : {})}}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={s.header}>
+          <h2 style={s.title}>
+            {task ? 'Edit Task' : 'Create New Task'}
+          </h2>
+          <button
+            type="button"
+            onClick={handleClose}
+            style={s.closeButton}
+            disabled={isSubmitting}
+            aria-label="Close modal"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={s.form}>
+          <div style={s.formContent}>
+            {/* Title - Required */}
+            <div style={s.section}>
+              <TaskField
+                type="text"
+                name="title"
+                label="Task Title"
+                placeholder="Enter task title..."
+                value={formData.title}
+                onChange={handleFieldChange}
+                required
+                error={errors.title}
+                helpText="A clear, concise description of what needs to be done"
+              />
+            </div>
+
+            {/* Project and Type Row */}
+            <div style={s.twoColumnRow}>
+              <TaskField
+                type="autocomplete"
+                name="project"
+                label="Project"
+                placeholder="Start typing project name..."
+                value={formData.project}
+                onChange={handleFieldChange}
+                suggestions={savedProjects}
+                helpText="Choose an existing project or create a new one"
+              />
+
+              <TaskField
+                type="taskType"
+                name="type"
+                label="Task Type"
+                value={formData.type}
+                onChange={handleFieldChange}
+                helpText="Select the category that best describes this task"
+              />
+            </div>
+
+            {/* Goal */}
+            <div style={s.section}>
+              <TaskField
+                type="textarea"
+                name="goal"
+                label="Goal/Description"
+                placeholder="Describe the goal or objective..."
+                value={formData.goal}
+                onChange={handleFieldChange}
+                rows={3}
+                maxRows={6}
+                helpText="Detailed description of what you want to achieve"
+              />
+            </div>
+
+            {/* Update Notes */}
+            <div style={s.section}>
+              <TaskField
+                type="textarea"
+                name="update"
+                label="Updates/Notes"
+                placeholder="Add progress updates or notes..."
+                value={formData.update}
+                onChange={handleFieldChange}
+                rows={2}
+                maxRows={4}
+                helpText="Current progress, notes, or additional information"
+              />
+            </div>
+
+            {/* Status and Due Date Row */}
+            <div style={s.twoColumnRow}>
+              <TaskField
+                type="taskStatus"
+                name="status"
+                label="Status"
+                value={formData.status}
+                onChange={handleFieldChange}
+                required
+                helpText="Current status of the task"
+              />
+
+              <TaskField
+                type="date"
+                name="dueDate"
+                label="Due Date"
+                value={formData.dueDate ? formData.dueDate.split('T')[0] : ''}
+                onChange={handleFieldChange}
+                showIcon
+                helpText="When should this task be completed?"
+              />
+            </div>
+
+            {/* Repeating Task Section */}
+            <div style={s.section}>
+              <div style={s.checkboxRow}>
+                <label style={s.checkboxLabel}>
+                  <input
+                    id="isRepeating-checkbox"
+                    type="checkbox"
+                    name="isRepeating"
+                    checked={formData.isRepeating}
+                    onChange={(e) => handleFieldChange(e.target.checked, 'isRepeating')}
+                  />
+                  <span>Repeating Task</span>
+                </label>
+              </div>
+
+              {formData.isRepeating && (
+                <TaskField
+                  type="repeatInterval"
+                  name="repeatInterval"
+                  label="Repeat Interval"
+                  value={formData.repeatInterval}
+                  onChange={handleFieldChange}
+                  required={formData.isRepeating}
+                  error={errors.repeatInterval}
+                  helpText="How often should this task repeat?"
+                />
+              )}
+            </div>
+
+            {/* Link */}
+            <div style={s.section}>
+              <TaskField
+                type="url"
+                name="link"
+                label="Related Link"
+                placeholder="https://example.com"
+                value={formData.link}
+                onChange={handleFieldChange}
+                showIcon
+                error={errors.link}
+                helpText="Optional link to relevant resources or documents"
+              />
+            </div>
+
+            {/* Priority Section */}
+            <div style={s.prioritySection}>
+              <div style={s.priorityHeader}>
+                <h3 style={s.priorityTitle}>Priority Rating</h3>
+                <div style={s.priorityActions}>
+                  {priorityScore > 0 && (
+                    <div style={s.priorityScore}>
+                      Score: <span style={s.scoreValue}>{priorityScore}</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRatePriority}
+                    style={s.ratePriorityBtn}
                   >
-                    {task.status === 'הושלם' ? '✓ Completed' : 'Complete'}
+                    <Star size={16} />
+                    {showPrioritySection ? 'Advanced Rating' : 'Rate Priority'}
                   </button>
+                  {!showPrioritySection && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPrioritySection(true)}
+                      style={s.showPriorityBtn}
+                    >
+                      <Plus size={16} />
+                      Show Ratings
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
+
+              {showPrioritySection && (
+                <div style={s.priorityRatings}>
+                  {priorityCategories.map(category => (
+                    <div key={category.id} style={s.priorityCategory}>
+                      <div style={s.categoryInfo}>
+                        <span 
+                          style={{...s.categoryName, color: category.color}}
+                        >
+                          {category.english} ({category.hebrew})
+                        </span>
+                        <span style={s.categoryWeight}>
+                          Weight: {category.weight}%
+                        </span>
+                      </div>
+                      <div style={s.ratingSlider}>
+                        <input
+                          id={`priority-${category.id}`}
+                          type="range"
+                          name={`priority-${category.id}`}
+                          min="0"
+                          max="5"
+                          step="1"
+                          value={formData.priorityRatings[category.id] || 0}
+                          onChange={(e) => handlePriorityRatingChange(category.id, parseInt(e.target.value))}
+                          style={{...s.slider, accentColor: category.color}}
+                        />
+                        <span style={s.ratingValue}>
+                          {formData.priorityRatings[category.id] || 0}/5
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {priorityCategories.length > 0 && (
+                    <div style={s.priorityTotal}>
+                      <strong>Total Priority Score: {priorityScore}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Submit Error */}
+            {errors.submit && (
+              <div style={s.submitError}>
+                {errors.submit}
+              </div>
+            )}
           </div>
-        )}
-      </main>
 
-      {toast.show && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          background: '#10b981',
-          color: 'white',
-          padding: '12px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 20px 25px rgba(0, 0, 0, 0.3)',
-          zIndex: 1001
-        }}>
-          {toast.message}
-        </div>
-      )}
-
-      <div style={{ 
-        background: 'white', 
-        borderRadius: '12px', 
-        padding: '20px', 
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-        marginTop: '20px'
-      }}>
-        <h3>🎯 Phase 1 Working!</h3>
-        <p>✅ Basic task creation working</p>
-        <p>✅ Task completion with points working</p>
-        <p>✅ All core components rendering</p>
-        <p style={{ color: '#10b981', fontWeight: 'bold' }}>
-          👤 Level {userProgress.level} • {userProgress.points} points • {tasks.length} tasks
-        </p>
+          {/* Footer Actions */}
+          <div style={s.footer}>
+            <button
+              type="button"
+              onClick={handleClose}
+              style={s.cancelButton}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              style={{
+                ...s.submitButton, 
+                opacity: (isSubmitting || !formData.title.trim()) ? 0.6 : 1,
+                cursor: (isSubmitting || !formData.title.trim()) ? 'not-allowed' : 'pointer'
+              }}
+              disabled={isSubmitting || !formData.title.trim()}
+            >
+              {isSubmitting ? (
+                <>Saving...</>
+              ) : (
+                <>
+                  <Save size={16} />
+                  {task ? 'Update Task' : 'Create Task'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
-
-// Main App with Provider
-function App() {
-  return (
-    <AppProvider>
-      <PriorityTaskManager />
-    </AppProvider>
-  );
-}
 
 export default App;

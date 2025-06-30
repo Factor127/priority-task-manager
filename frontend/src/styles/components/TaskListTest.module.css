@@ -1,0 +1,185 @@
+// TaskListTest.jsx - Comprehensive TaskList testing
+import React, { useState } from 'react';
+import { Search, Filter, Plus, X } from 'lucide-react';
+import TaskList from './TaskList';
+import styles from './TaskListTest.module.css';
+
+const TaskListTest = () => {
+  // Sample priority categories
+  const priorityCategories = [
+    { id: 'income', english: 'Income/Revenue', hebrew: 'הכנסה לשוטף', weight: 40, color: '#10B981' },
+    { id: 'home', english: 'Home Management', hebrew: 'ניהול בית', weight: 15, color: '#3B82F6' },
+    { id: 'plan', english: '5-Year Plan', hebrew: 'תוכנית חומש', weight: 5, color: '#8B5CF6' },
+    { id: 'social', english: 'Social', hebrew: 'סוציאל', weight: 20, color: '#F59E0B' },
+    { id: 'relationship', english: 'Relationship', hebrew: 'זוגיות', weight: 5, color: '#EF4444' },
+    { id: 'personal', english: 'Personal', hebrew: 'עצמי', weight: 20, color: '#06B6D4' },
+    { id: 'children', english: 'Children', hebrew: 'ילדים', weight: 30, color: '#84CC16' }
+  ];
+
+  // Sample projects
+  const savedProjects = [
+    'Personal Development',
+    'Business Growth',
+    'Family',
+    'Health',
+    'Learning',
+    'Finance',
+    'Website Redesign',
+    'Mobile App Development',
+    'Home Improvement',
+    'Career Planning'
+  ];
+
+  // Sample tasks with variety for testing
+  const [tasks, setTasks] = useState([
+    {
+      id: 1,
+      title: 'Complete React TaskList Component',
+      project: 'Website Redesign',
+      goal: 'Build a comprehensive task list component with filtering, sorting, and search functionality.',
+      update: 'Making good progress. Need to add search and filter integration.',
+      type: 'פיתוח',
+      status: 'בעבודה',
+      dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+      isRepeating: false,
+      priorityRatings: { income: 4, personal: 5, plan: 3 },
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 1000).toISOString(),
+      completedAt: null
+    },
+    {
+      id: 2,
+      title: 'Daily workout routine',
+      project: 'Health',
+      goal: 'Maintain consistent exercise schedule with cardio and strength training.',
+      update: 'Completed today\'s session. Feeling energized!',
+      type: 'עצמי',
+      status: 'הושלם',
+      dueDate: new Date().toISOString(),
+      isRepeating: true,
+      repeatInterval: 'daily',
+      priorityRatings: { personal: 5, home: 2 },
+      createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      completedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 3,
+      title: 'Review quarterly budget',
+      project: 'Finance',
+      goal: 'Analyze spending patterns and adjust budget for next quarter.',
+      update: '',
+      type: 'מנהלה',
+      status: 'לא התחיל',
+      dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // Overdue
+      isRepeating: true,
+      repeatInterval: 'monthly',
+      priorityRatings: { income: 5, plan: 4 },
+      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      completedAt: null
+    },
+    {
+      id: 4,
+      title: 'Plan family vacation',
+      project: 'Family',
+      goal: 'Research destinations and book summer vacation.',
+      update: 'Found some great beach resorts. Need to check availability.',
+      type: 'תיכנון',
+      status: 'תיכנון',
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      isRepeating: false,
+      priorityRatings: { children: 5, social: 4, relationship: 3 },
+      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      completedAt: null
+    },
+    {
+      id: 5,
+      title: 'Learn React Context API',
+      project: 'Learning',
+      goal: 'Master React Context for state management in large applications.',
+      update: 'Watched several tutorials. Ready to implement in project.',
+      type: 'מחקר',
+      status: 'בעבודה',
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      isRepeating: false,
+      priorityRatings: { personal: 4, plan: 5, income: 3 },
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      completedAt: null
+    },
+    {
+      id: 6,
+      title: 'Organize home office',
+      project: 'Home Improvement',
+      goal: 'Declutter and organize workspace for better productivity.',
+      update: 'Cleared desk and organized cables. Much better now!',
+      type: 'מנהלה',
+      status: 'הושלם',
+      dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      isRepeating: false,
+      priorityRatings: { home: 4, personal: 3 },
+      createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+      completedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 7,
+      title: 'Update resume and LinkedIn profile',
+      project: 'Career Planning',
+      goal: 'Refresh professional profiles with recent projects and skills.',
+      update: 'Updated experience section. Need to add recent certifications.',
+      type: 'פיתוח עיסקי',
+      status: 'בעבודה',
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      isRepeating: false,
+      priorityRatings: { income: 5, plan: 4, personal: 3 },
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      completedAt: null
+    }
+  ]);
+
+  // UI State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Get unique projects for filter dropdown
+  const uniqueProjects = [...new Set(tasks.map(task => task.project).filter(Boolean))].sort();
+
+  // Handle task operations
+  const handleTaskUpdate = (taskId, updates) => {
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task.id === taskId 
+          ? { ...task, ...updates, updatedAt: new Date().toISOString() }
+          : task
+      )
+    );
+    console.log('Task updated:', taskId, updates);
+  };
+
+  const handleTaskDelete = (taskId) => {
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+    console.log('Task deleted:', taskId);
+  };
+
+  const handleTaskToggleComplete = (task, isCompleted) => {
+    const updates = {
+      completedAt: isCompleted ? new Date().toISOString() : null,
+      status: isCompleted ? 'הושלם' : 'לא התחיל'
+    };
+    
+    handleTaskUpdate(task.id, updates);
+    
+    if (isCompleted) {
+      console.log(`Task completed! Points earned based on priority score.`);
+    }
+  };
+
+  const handleRatePriority = (task) => {
+    console.log('Rate priority for task:', task.title);

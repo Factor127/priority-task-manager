@@ -1,0 +1,197 @@
+/* src/styles/components/AutosaveIndicator.module.css */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid transparent;
+  backdrop-filter: blur(8px);
+  position: relative;
+  overflow: hidden;
+}
+
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon {
+  transition: all 0.3s ease;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0; /* Allow text truncation */
+}
+
+.statusText {
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.timestamp {
+  font-size: 10px;
+  opacity: 0.7;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Status-specific styles */
+.idle {
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.idle .icon {
+  color: #9ca3af;
+}
+
+.saving {
+  color: #3b82f6;
+  border-color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.saving .icon {
+  color: #3b82f6;
+}
+
+.saved {
+  color: #10b981;
+  border-color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.saved .icon {
+  color: #10b981;
+}
+
+.error {
+  color: #ef4444;
+  border-color: #fecaca;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.error .icon {
+  color: #ef4444;
+}
+
+/* Pulse animation for saving state */
+.pulse {
+  animation: iconPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Pulse dot animation */
+.pulseContainer {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pulseDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: 4px 8px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  
+  .icon {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .timestamp {
+    font-size: 9px;
+  }
+  
+  .pulseDot {
+    width: 5px;
+    height: 5px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .container {
+    border-width: 2px;
+    background: #ffffff;
+  }
+  
+  .idle {
+    color: #000000;
+    border-color: #000000;
+  }
+  
+  .saving {
+    color: #0066cc;
+    border-color: #0066cc;
+  }
+  
+  .saved {
+    color: #006600;
+    border-color: #006600;
+  }
+  
+  .error {
+    color: #cc0000;
+    border-color: #cc0000;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .pulse,
+  .pulseDot {
+    animation: none;
+  }
+  
+  .container {
+    transition: none;
+  }
+  
+  .icon {
+    transition: none;
+  }
+}

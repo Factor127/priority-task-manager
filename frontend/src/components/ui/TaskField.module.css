@@ -1,0 +1,338 @@
+/* TaskField.module.css */
+
+/* Field Group Container */
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Label Styles */
+.label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.labelRequired {
+  font-weight: 600;
+}
+
+.required {
+  color: #ef4444;
+  font-weight: bold;
+  margin-left: 0.125rem;
+}
+
+/* Input Wrapper */
+.inputWrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Base Field Styles */
+.field {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  background-color: #ffffff;
+  color: #111827;
+  transition: all 0.2s ease-in-out;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.field:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.field::placeholder {
+  color: #9ca3af;
+}
+
+/* Textarea Specific */
+.textarea {
+  resize: none;
+  overflow-y: auto;
+  min-height: 4.5rem;
+  line-height: 1.5;
+}
+
+.textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.textarea::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.textarea::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.textarea::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Select Styles */
+select.field {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+  padding-right: 2.5rem;
+}
+
+select.field:focus {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%234f46e5' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* Field States */
+.fieldFocused {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.fieldError {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.fieldDisabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.fieldDisabled::placeholder {
+  color: #d1d5db;
+}
+
+/* Date Input Wrapper */
+.dateInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dateIcon {
+  position: absolute;
+  right: 0.75rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+/* URL Input Wrapper */
+.urlInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.urlIcon {
+  position: absolute;
+  right: 0.75rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+/* Autocomplete Styles */
+.autocompleteWrapper {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 0.5rem 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  max-height: 12rem;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.suggestion {
+  width: 100%;
+  padding: 0.75rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s ease;
+}
+
+.suggestion:hover,
+.suggestion:focus {
+  background-color: #f3f4f6;
+  outline: none;
+}
+
+.suggestion:last-child {
+  border-bottom: none;
+}
+
+/* Error Message */
+.error {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.error svg {
+  flex-shrink: 0;
+}
+
+/* Help Text */
+.helpText {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Hebrew/RTL Support */
+.field[dir="rtl"],
+.field:lang(he) {
+  text-align: right;
+  direction: rtl;
+}
+
+select.field[dir="rtl"],
+select.field:lang(he) {
+  background-position: left 0.75rem center;
+  padding-left: 2.5rem;
+  padding-right: 0.75rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 640px) {
+  .field {
+    font-size: 1rem; /* Prevent zoom on iOS */
+    padding: 0.875rem;
+  }
+  
+  .textarea {
+    min-height: 5rem;
+  }
+  
+  .suggestions {
+    max-height: 8rem;
+  }
+  
+  .suggestion {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .label {
+    color: #f3f4f6;
+  }
+  
+  .field {
+    background-color: #1f2937;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+  
+  .field:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  
+  .field::placeholder {
+    color: #6b7280;
+  }
+  
+  .fieldDisabled {
+    background-color: #111827;
+    color: #6b7280;
+  }
+  
+  .suggestions {
+    background-color: #1f2937;
+    border-color: #4b5563;
+  }
+  
+  .suggestion {
+    color: #f3f4f6;
+    border-bottom-color: #374151;
+  }
+  
+  .suggestion:hover,
+  .suggestion:focus {
+    background-color: #374151;
+  }
+  
+  .helpText {
+    color: #9ca3af;
+  }
+  
+  .dateIcon,
+  .urlIcon {
+    color: #9ca3af;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .field {
+    border-width: 2px;
+  }
+  
+  .fieldFocused {
+    border-width: 3px;
+  }
+  
+  .fieldError {
+    border-width: 3px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .field {
+    transition: none;
+  }
+  
+  .suggestion {
+    transition: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .suggestions {
+    display: none;
+  }
+  
+  .field {
+    border: 1px solid #000;
+    background: transparent;
+  }
+}
