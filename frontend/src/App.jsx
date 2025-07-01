@@ -94,8 +94,14 @@ const AutosaveIndicator = () => {
   const context = useApp();
   
   // Use local fallback if AUTOSAVE_STATES is not available from context
-  const AUTOSAVE_STATES = context.AUTOSAVE_STATES || LOCAL_AUTOSAVE_STATES;
-  const overallSaveState = context.overallSaveState || LOCAL_AUTOSAVE_STATES.IDLE;
+    const AUTOSAVE_STATES = {
+    IDLE: 'idle',
+    SAVING: 'saving', 
+    SAVED: 'saved',
+    ERROR: 'error'
+  };
+    const overallSaveState = context?.overallSaveState || AUTOSAVE_STATES.IDLE;
+
 
   const getIndicatorContent = () => {
     switch (overallSaveState) {
@@ -141,7 +147,7 @@ const AutosaveIndicator = () => {
   const { text, color, background, borderColor, showDot, pulsing } = getIndicatorContent();
 
   return (
-    <div style={{
+     <div style={{
       fontSize: '12px',
       color: color,
       background: background,
