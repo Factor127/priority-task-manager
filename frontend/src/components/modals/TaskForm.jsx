@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, Save, Plus } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 
 const TaskForm = ({
   isOpen = false,
   onClose,
   onSubmit,
-  onRatePriority,
+  onSave, // Alternative prop name used in your App.jsx
+  onCancel, // Alternative prop name used in your App.jsx
   task = null,
   savedProjects = [],
   priorityCategories = [],
@@ -27,7 +28,6 @@ const TaskForm = ({
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPrioritySection, setShowPrioritySection] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -44,7 +44,6 @@ const TaskForm = ({
         link: task.link || '',
         priorityRatings: task.priorityRatings || {}
       });
-      setShowPrioritySection(Object.keys(task.priorityRatings || {}).length > 0);
     } else {
       setFormData({
         title: '',
@@ -59,12 +58,10 @@ const TaskForm = ({
         link: '',
         priorityRatings: {}
       });
-      setShowPrioritySection(false);
     }
     setErrors({});
   }, [task, isOpen]);
 
-  // FIXED SWAP 3: Input sanitization
   const handleInputChange = (fieldName, value) => {
     let sanitizedValue = value;
     if (typeof value === 'string') {
@@ -86,57 +83,18 @@ const TaskForm = ({
     }
   };
 
-  const calculatePriorityScore = () => {
-    let score = 0;
-    priorityCategories.forEach(category => {
-      const rating = formData.priorityRatings[category.id] || 0;
-      const weight = category.weight || 0;
-      score += (rating * weight) / 100;
-    });
-
-    if (formData.dueDate) {
-      const today = new Date();
-      const dueDate = new Date(formData.dueDate);
-      const diffTime = dueDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays <= 0) {
-        score += 50;
-      } else if (diffDays <= 3) {
-        score += 30;
-      } else if (diffDays <= 7) {
-        score += 15;
+  const isValidUrl = (string) => {
+    try {
+      const url = new URL(string);
+      if (url.protocol === 'javascript:' || url.protocol === 'data:' || url.protocol === 'vbscript:') {
+        return false;
       }
-    }
-
-    return Math.round(score * 10) / 10;
-  };
-
-  const handleFieldChange = (value, fieldName) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
-
-    if (errors[fieldName]) {
-      setErrors(prev => ({
-        ...prev,
-        [fieldName]: ''
-      }));
+      return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:';
+    } catch (_) {
+      return false;
     }
   };
 
-  const handlePriorityRatingChange = (categoryId, rating) => {
-    setFormData(prev => ({
-      ...prev,
-      priorityRatings: {
-        ...prev.priorityRatings,
-        [categoryId]: rating
-      }
-    }));
-  };
-
-  // FIXED SWAP 2: Enhanced title validation
   const validateForm = () => {
     const newErrors = {};
 
@@ -148,7 +106,6 @@ const TaskForm = ({
       newErrors.title = 'Task title must be at least 2 characters';
     }
 
-    // CLEAR SWAP 5: Goal and update length validation
     if (formData.goal && formData.goal.length > 1000) {
       newErrors.goal = 'Goal description must be less than 1000 characters';
     }
@@ -169,19 +126,6 @@ const TaskForm = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // FIXED SWAP 1: Enhanced URL validation
-  const isValidUrl = (string) => {
-    try {
-      const url = new URL(string);
-      if (url.protocol === 'javascript:' || url.protocol === 'data:' || url.protocol === 'vbscript:') {
-        return false;
-      }
-      return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:';
-    } catch (_) {
-      return false;
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -194,7 +138,6 @@ const TaskForm = ({
     try {
       const taskData = {
         ...formData,
-        // FIXED SWAP 4: Enhanced date validation
         dueDate: formData.dueDate ? (() => {
           const date = new Date(formData.dueDate);
           if (isNaN(date.getTime())) {
@@ -207,11 +150,16 @@ const TaskForm = ({
         ...(task ? {} : { createdAt: new Date().toISOString() })
       };
 
-      await onSubmit(taskData);
+      // Handle different prop names
+      if (onSave) {
+        await onSave(taskData);
+      } else if (onSubmit) {
+        await onSubmit(taskData);
+      }
+      
       handleClose();
     } catch (error) {
       console.error('Error submitting task:', error);
-      // CLEAR SWAP 6: Enhanced error display
       setErrors({ submit: `Failed to save task: ${error.message || 'Please try again.'}` });
     } finally {
       setIsSubmitting(false);
@@ -220,7 +168,11 @@ const TaskForm = ({
 
   const handleClose = () => {
     if (!isSubmitting) {
-      onClose();
+      if (onCancel) {
+        onCancel();
+      } else if (onClose) {
+        onClose();
+      }
     }
   };
 
@@ -242,17 +194,7 @@ const TaskForm = ({
     };
   }, [isOpen]);
 
-  const handleRatePriority = () => {
-    if (onRatePriority) {
-      onRatePriority(formData);
-    } else {
-      setShowPrioritySection(true);
-    }
-  };
-
-  const priorityScore = calculatePriorityScore();
-
-  // Simple inline styles (since CSS modules aren't working)
+  // Inline styles since CSS modules might not be available
   const styles = {
     overlay: {
       position: 'fixed',
@@ -298,13 +240,22 @@ const TaskForm = ({
       maxHeight: '60vh',
       overflowY: 'auto'
     },
+    fieldGroup: {
+      marginBottom: '16px'
+    },
+    label: {
+      display: 'block',
+      marginBottom: '5px',
+      fontWeight: '500',
+      fontSize: '14px'
+    },
     input: {
       width: '100%',
       padding: '8px 12px',
       border: '1px solid #d1d5db',
       borderRadius: '6px',
       fontSize: '14px',
-      marginBottom: '10px'
+      boxSizing: 'border-box'
     },
     textarea: {
       width: '100%',
@@ -312,15 +263,9 @@ const TaskForm = ({
       border: '1px solid #d1d5db',
       borderRadius: '6px',
       fontSize: '14px',
-      marginBottom: '10px',
       resize: 'vertical',
-      minHeight: '60px'
-    },
-    label: {
-      display: 'block',
-      marginBottom: '5px',
-      fontWeight: '500',
-      fontSize: '14px'
+      minHeight: '60px',
+      boxSizing: 'border-box'
     },
     error: {
       color: '#dc2626',
@@ -339,7 +284,10 @@ const TaskForm = ({
       border: 'none',
       borderRadius: '6px',
       cursor: 'pointer',
-      fontSize: '14px'
+      fontSize: '14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
     },
     primaryButton: {
       backgroundColor: '#4f46e5',
@@ -372,7 +320,7 @@ const TaskForm = ({
 
         <form onSubmit={handleSubmit}>
           <div style={styles.formContent}>
-            <div>
+            <div style={styles.fieldGroup}>
               <label style={styles.label}>Task Title *</label>
               <input
                 type="text"
@@ -384,7 +332,7 @@ const TaskForm = ({
               {errors.title && <div style={styles.error}>{errors.title}</div>}
             </div>
 
-            <div>
+            <div style={styles.fieldGroup}>
               <label style={styles.label}>Project</label>
               <input
                 type="text"
@@ -395,7 +343,7 @@ const TaskForm = ({
               />
             </div>
 
-            <div>
+            <div style={styles.fieldGroup}>
               <label style={styles.label}>Goal/Description</label>
               <textarea
                 value={formData.goal}
@@ -406,7 +354,7 @@ const TaskForm = ({
               {errors.goal && <div style={styles.error}>{errors.goal}</div>}
             </div>
 
-            <div>
+            <div style={styles.fieldGroup}>
               <label style={styles.label}>Updates/Notes</label>
               <textarea
                 value={formData.update}
@@ -417,7 +365,30 @@ const TaskForm = ({
               {errors.update && <div style={styles.error}>{errors.update}</div>}
             </div>
 
-            <div>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) => handleInputChange('status', e.target.value)}
+                style={styles.input}
+              >
+                <option value="לא התחיל">לא התחיל</option>
+                <option value="בעבודה">בעבודה</option>
+                <option value="הושלם">הושלם</option>
+              </select>
+            </div>
+
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Due Date</label>
+              <input
+                type="date"
+                value={formData.dueDate ? formData.dueDate.split('T')[0] : ''}
+                onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.fieldGroup}>
               <label style={styles.label}>Link</label>
               <input
                 type="text"
@@ -450,7 +421,12 @@ const TaskForm = ({
               style={{...styles.button, ...styles.primaryButton}}
               disabled={isSubmitting || !formData.title.trim()}
             >
-              {isSubmitting ? 'Saving...' : (task ? 'Update Task' : 'Create Task')}
+              {isSubmitting ? 'Saving...' : (
+                <>
+                  <Save size={16} />
+                  {task ? 'Update Task' : 'Create Task'}
+                </>
+              )}
             </button>
           </div>
         </form>
