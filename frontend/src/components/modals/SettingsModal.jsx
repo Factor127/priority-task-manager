@@ -1,15 +1,5 @@
-// SettingsModal.jsx - No External Icons Version
+// SettingsModal.jsx - Complete Implementation
 import React, { useState, useEffect } from 'react';
-
-// Simple icon components to replace Lucide React
-const X = () => <span>✕</span>;
-const Plus = () => <span>+</span>;
-const Trash2 = () => <span>🗑️</span>;
-const RotateCcw = () => <span>🔄</span>;
-const Download = () => <span>📤</span>;
-const Upload = () => <span>📥</span>;
-const Save = () => <span>💾</span>;
-const AlertCircle = () => <span>⚠️</span>;
 
 const SettingsModal = ({ 
   isOpen, 
@@ -19,13 +9,16 @@ const SettingsModal = ({
   onExportData,
   onImportData,
   onResetData,
-  taskStats = { total: 0, completed: 0, active: 0 }
+  taskStats = { total: 0, completed: 0, active: 0, overdue: 0 }
 }) => {
-  console.log('🔍 SettingsModal render:', { isOpen, priorityCategories, taskStats });
-
   const [activeTab, setActiveTab] = useState('categories');
   const [categories, setCategories] = useState([]);
-  const [newCategory, setNewCategory] = useState({ english: '', hebrew: '', weight: 10, color: '#4f46e5' });
+  const [newCategory, setNewCategory] = useState({ 
+    english: '', 
+    hebrew: '', 
+    weight: 10, 
+    color: '#4f46e5' 
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
 
@@ -39,11 +32,9 @@ const SettingsModal = ({
 
   // Initialize categories from props
   useEffect(() => {
-    console.log('🔍 Categories effect:', priorityCategories);
     if (priorityCategories && priorityCategories.length > 0) {
       setCategories([...priorityCategories]);
     } else {
-      // Set default categories if none provided
       const defaultCategories = [
         { id: 'income', english: 'Income/Revenue', hebrew: 'הכנסה לשוטף', weight: 40, color: '#10B981' },
         { id: 'home', english: 'Home Management', hebrew: 'ניהול בית', weight: 15, color: '#3B82F6' },
@@ -104,7 +95,6 @@ const SettingsModal = ({
   };
 
   const handleSaveChanges = () => {
-    console.log('💾 Saving categories:', categories);
     if (onUpdateCategories) {
       onUpdateCategories(categories);
     }
@@ -112,7 +102,6 @@ const SettingsModal = ({
   };
 
   const handleClose = () => {
-    console.log('🚪 Closing modal, hasChanges:', hasChanges);
     if (hasChanges) {
       if (window.confirm('You have unsaved changes. Close without saving?')) {
         onClose();
@@ -122,84 +111,96 @@ const SettingsModal = ({
     }
   };
 
-  // Calculate total weight
-  const totalWeight = categories.reduce((sum, cat) => sum + cat.weight, 0);
+  // File handling
+  const handleFileImport = (event) => {
+    const file = event.target.files[0];
+    if (file && onImportData) {
+      onImportData(file);
+    }
+    event.target.value = '';
+  };
 
-  if (!isOpen) {
-    console.log('❌ Modal not open, not rendering');
-    return null;
-  }
+  const handleExportData = () => {
+    if (onExportData) {
+      onExportData();
+    }
+  };
 
-  console.log('✅ Rendering SettingsModal');
+  const handleResetData = () => {
+    const message = `This will permanently delete ALL your data including:
+    
+• ${taskStats.total} tasks
+• All priority categories
+• All saved projects
+• All progress data
+
+This action cannot be undone. Are you sure?`;
+
+    if (window.confirm(message)) {
+      if (onResetData) {
+        onResetData();
+      }
+    }
+  };
+
+  if (!isOpen) return null;
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        width: '100%',
+        maxWidth: '800px',
+        maxHeight: '90vh',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)'
-      }} 
-      onClick={handleClose}
-    >
-      <div 
-        style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '800px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden'
-        }} 
-        onClick={(e) => e.stopPropagation()}
-      >
+        flexDirection: 'column',
+        boxShadow: '0 20px 25px rgba(0, 0, 0, 0.3)'
+      }} onClick={(e) => e.stopPropagation()}>
+        
         {/* Header */}
         <div style={{
-          padding: '24px',
-          borderBottom: '1px solid #e5e7eb',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white'
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px',
+          borderBottom: '1px solid #e5e7eb'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700' }}>⚙️ Settings</h2>
-              <p style={{ margin: '4px 0 0 0', opacity: 0.9 }}>Customize your Priority Task Manager</p>
-            </div>
-            <button
-              onClick={handleClose}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: 'none',
-                borderRadius: '8px',
-                color: 'white',
-                padding: '8px 12px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                fontSize: '16px'
-              }}
-            >
-              <X />
-            </button>
-          </div>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: '#1f2937' }}>
+            ⚙️ Settings
+          </h2>
+          <button
+            onClick={handleClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '20px',
+              cursor: 'pointer',
+              color: '#6b7280',
+              padding: '4px'
+            }}
+          >
+            ✕
+          </button>
         </div>
 
         {/* Tabs */}
         <div style={{
           display: 'flex',
           borderBottom: '1px solid #e5e7eb',
-          background: '#f8fafc'
+          background: '#f9fafb'
         }}>
           <button 
             style={{
@@ -260,17 +261,14 @@ const SettingsModal = ({
           padding: '24px',
           overflow: 'auto'
         }}>
+          
+          {/* Categories Tab */}
           {activeTab === 'categories' && (
             <div>
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ margin: '0 0 8px 0', color: '#1f2937' }}>Priority Categories</h3>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  Customize the categories used for priority scoring. Total weight: <strong>{totalWeight}%</strong>
-                  {totalWeight !== 100 && (
-                    <span style={{ color: '#ef4444', marginLeft: '8px' }}>
-                      (Recommended: 100%)
-                    </span>
-                  )}
+                  Customize the categories used for priority scoring. Total weight: {categories.reduce((sum, cat) => sum + cat.weight, 0)}%
                 </p>
               </div>
 
@@ -278,503 +276,462 @@ const SettingsModal = ({
               <div style={{ marginBottom: '24px' }}>
                 {categories.map((category) => (
                   <div key={category.id} style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginBottom: '12px'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    backgroundColor: '#f9fafb'
                   }}>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: window.innerWidth > 768 ? '1fr 1fr 100px 60px 40px' : '1fr',
-                      gap: '12px', 
-                      alignItems: 'center' 
-                    }}>
-                      <input
-                        type="text"
-                        value={category.english}
-                        onChange={(e) => handleCategoryChange(category.id, 'english', e.target.value)}
-                        placeholder="English name"
+                    {/* Color */}
+                    <div style={{ position: 'relative' }}>
+                      <div
                         style={{
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px'
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '4px',
+                          backgroundColor: category.color,
+                          cursor: 'pointer',
+                          border: '2px solid white',
+                          boxShadow: '0 0 0 1px #e5e7eb'
                         }}
+                        onClick={() => setShowColorPicker(showColorPicker === category.id ? null : category.id)}
                       />
-                      <input
-                        type="text"
-                        value={category.hebrew}
-                        onChange={(e) => handleCategoryChange(category.id, 'hebrew', e.target.value)}
-                        placeholder="Hebrew name"
-                        style={{
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          direction: 'rtl'
-                        }}
-                      />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <input
-                          type="number"
-                          value={category.weight}
-                          onChange={(e) => handleCategoryChange(category.id, 'weight', parseInt(e.target.value) || 0)}
-                          min="0"
-                          max="100"
-                          style={{
-                            padding: '8px 12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            fontSize: '14px',
-                            width: '70px'
-                          }}
-                        />
-                        <span style={{ fontSize: '14px', color: '#6b7280' }}>%</span>
-                      </div>
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          onClick={() => setShowColorPicker(showColorPicker === category.id ? null : category.id)}
-                          style={{
-                            width: '40px',
-                            height: '32px',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '6px',
-                            backgroundColor: category.color,
-                            cursor: 'pointer'
-                          }}
-                        />
-                        {showColorPicker === category.id && (
+                      {showColorPicker === category.id && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '30px',
+                          left: 0,
+                          zIndex: 10,
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '8px',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                        }}>
                           <div style={{
-                            position: 'absolute',
-                            top: '36px',
-                            right: 0,
-                            background: 'white',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-                            zIndex: 10
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(5, 1fr)',
+                            gap: '4px',
+                            width: '120px'
                           }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-                              {colorPalette.map(color => (
-                                <button
-                                  key={color}
-                                  onClick={() => {
-                                    handleCategoryChange(category.id, 'color', color);
-                                    setShowColorPicker(null);
-                                  }}
-                                  style={{
-                                    width: '24px',
-                                    height: '24px',
-                                    backgroundColor: color,
-                                    border: category.color === color ? '2px solid #1f2937' : '1px solid #e5e7eb',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                  }}
-                                />
-                              ))}
-                            </div>
+                            {colorPalette.map(color => (
+                              <div
+                                key={color}
+                                style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  backgroundColor: color,
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  border: category.color === color ? '2px solid #4f46e5' : '1px solid #e5e7eb'
+                                }}
+                                onClick={() => {
+                                  handleCategoryChange(category.id, 'color', color);
+                                  setShowColorPicker(null);
+                                }}
+                              />
+                            ))}
                           </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleDeleteCategory(category.id)}
-                        disabled={categories.length <= 1}
-                        style={{
-                          background: categories.length <= 1 ? '#f3f4f6' : '#fee2e2',
-                          color: categories.length <= 1 ? '#9ca3af' : '#dc2626',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '6px',
-                          cursor: categories.length <= 1 ? 'not-allowed' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Trash2 />
-                      </button>
+                        </div>
+                      )}
                     </div>
+
+                    {/* English Name */}
+                    <input
+                      type="text"
+                      value={category.english}
+                      onChange={(e) => handleCategoryChange(category.id, 'english', e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="English name"
+                    />
+
+                    {/* Hebrew Name */}
+                    <input
+                      type="text"
+                      value={category.hebrew}
+                      onChange={(e) => handleCategoryChange(category.id, 'hebrew', e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        direction: 'rtl'
+                      }}
+                      placeholder="Hebrew name"
+                    />
+
+                    {/* Weight */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input
+                        type="number"
+                        value={category.weight}
+                        onChange={(e) => handleCategoryChange(category.id, 'weight', parseInt(e.target.value) || 0)}
+                        style={{
+                          width: '60px',
+                          padding: '8px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                          textAlign: 'center'
+                        }}
+                        min="0"
+                        max="100"
+                      />
+                      <span style={{ fontSize: '14px', color: '#6b7280' }}>%</span>
+                    </div>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => handleDeleteCategory(category.id)}
+                      disabled={categories.length <= 1}
+                      style={{
+                        padding: '8px',
+                        border: 'none',
+                        backgroundColor: categories.length <= 1 ? '#f3f4f6' : '#fee2e2',
+                        color: categories.length <= 1 ? '#9ca3af' : '#dc2626',
+                        borderRadius: '4px',
+                        cursor: categories.length <= 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '14px'
+                      }}
+                      title={categories.length <= 1 ? 'Cannot delete the last category' : 'Delete category'}
+                    >
+                      🗑️
+                    </button>
                   </div>
                 ))}
               </div>
 
               {/* Add New Category */}
               <div style={{
-                background: '#eff6ff',
-                border: '2px dashed #3b82f6',
-                borderRadius: '12px',
-                padding: '16px'
+                padding: '16px',
+                border: '2px dashed #d1d5db',
+                borderRadius: '8px',
+                marginBottom: '24px'
               }}>
-                <h4 style={{ margin: '0 0 12px 0', color: '#1e40af' }}>Add New Category</h4>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: window.innerWidth > 768 ? '1fr 1fr 100px 60px 80px' : '1fr',
-                  gap: '12px', 
-                  alignItems: 'end' 
-                }}>
-                  <input
-                    type="text"
-                    value={newCategory.english}
-                    onChange={(e) => setNewCategory(prev => ({ ...prev, english: e.target.value }))}
-                    placeholder="English name"
-                    style={{
-                      padding: '8px 12px',
-                      border: '1px solid #3b82f6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={newCategory.hebrew}
-                    onChange={(e) => setNewCategory(prev => ({ ...prev, hebrew: e.target.value }))}
-                    placeholder="Hebrew name"
-                    style={{
-                      padding: '8px 12px',
-                      border: '1px solid #3b82f6',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      direction: 'rtl'
-                    }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>Add New Category</h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '120px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                      English Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newCategory.english}
+                      onChange={(e) => setNewCategory(prev => ({ ...prev, english: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="e.g., Business"
+                    />
+                  </div>
+                  
+                  <div style={{ flex: 1, minWidth: '120px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                      Hebrew Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newCategory.hebrew}
+                      onChange={(e) => setNewCategory(prev => ({ ...prev, hebrew: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        direction: 'rtl'
+                      }}
+                      placeholder="עסקים"
+                    />
+                  </div>
+                  
+                  <div style={{ minWidth: '80px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                      Weight %
+                    </label>
                     <input
                       type="number"
                       value={newCategory.weight}
                       onChange={(e) => setNewCategory(prev => ({ ...prev, weight: parseInt(e.target.value) || 0 }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        textAlign: 'center'
+                      }}
                       min="0"
                       max="100"
-                      style={{
-                        padding: '8px 12px',
-                        border: '1px solid #3b82f6',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        width: '70px'
-                      }}
                     />
-                    <span style={{ fontSize: '14px', color: '#1e40af' }}>%</span>
                   </div>
-                  <button
-                    onClick={() => setShowColorPicker(showColorPicker === 'new' ? null : 'new')}
-                    style={{
-                      width: '40px',
-                      height: '32px',
-                      border: '2px solid #3b82f6',
-                      borderRadius: '6px',
-                      backgroundColor: newCategory.color,
-                      cursor: 'pointer',
-                      position: 'relative'
-                    }}
-                  />
+                  
                   <button
                     onClick={handleAddCategory}
                     disabled={!newCategory.english.trim()}
                     style={{
-                      background: newCategory.english.trim() ? '#3b82f6' : '#9ca3af',
-                      color: 'white',
+                      padding: '8px 16px',
+                      backgroundColor: !newCategory.english.trim() ? '#f3f4f6' : '#4f46e5',
+                      color: !newCategory.english.trim() ? '#9ca3af' : 'white',
                       border: 'none',
-                      borderRadius: '6px',
-                      padding: '8px 12px',
-                      cursor: newCategory.english.trim() ? 'pointer' : 'not-allowed',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
+                      borderRadius: '4px',
+                      cursor: !newCategory.english.trim() ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
                       fontWeight: '500'
                     }}
                   >
-                    <Plus />
-                    Add
+                    ➕ Add
                   </button>
                 </div>
-                {showColorPicker === 'new' && (
-                  <div style={{
-                    marginTop: '12px',
-                    background: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '12px'
-                  }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '6px' }}>
-                      {colorPalette.map(color => (
-                        <button
-                          key={color}
-                          onClick={() => {
-                            setNewCategory(prev => ({ ...prev, color }));
-                            setShowColorPicker(null);
-                          }}
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            backgroundColor: color,
-                            border: newCategory.color === color ? '2px solid #1f2937' : '1px solid #e5e7eb',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Reset Button */}
-              <div style={{ marginTop: '24px', textAlign: 'center' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                 <button
                   onClick={handleResetCategories}
                   style={{
-                    background: '#f3f4f6',
+                    padding: '8px 16px',
+                    backgroundColor: '#f3f4f6',
                     color: '#374151',
                     border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    padding: '8px 16px',
+                    borderRadius: '6px',
                     cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
                     fontSize: '14px'
                   }}
                 >
-                  <RotateCcw />
-                  Reset to Defaults
+                  🔄 Reset to Defaults
+                </button>
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={!hasChanges}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: !hasChanges ? '#f3f4f6' : '#10b981',
+                    color: !hasChanges ? '#9ca3af' : 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: !hasChanges ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  💾 Save Changes
                 </button>
               </div>
             </div>
           )}
 
+          {/* Data Management Tab */}
           {activeTab === 'data' && (
             <div>
-              <h3 style={{ margin: '0 0 16px 0', color: '#1f2937' }}>Data Management</h3>
-              
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: '#1f2937' }}>Data Management</h3>
+                <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+                  Export, import, or reset your task data.
+                </p>
+              </div>
+
               {/* Export Section */}
               <div style={{
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '12px',
                 padding: '20px',
-                marginBottom: '20px'
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                backgroundColor: '#f9fafb'
               }}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#166534' }}>📤 Export Data</h4>
-                <p style={{ margin: '0 0 16px 0', color: '#15803d', fontSize: '14px' }}>
-                  Download your tasks and settings as a backup file
+                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>📤 Export Data</h4>
+                <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>
+                  Download a complete backup of all your tasks, categories, and settings.
                 </p>
                 <button
-                  onClick={() => {
-                    console.log('📤 Export clicked');
-                    onExportData && onExportData();
-                  }}
+                  onClick={handleExportData}
                   style={{
-                    background: '#16a34a',
+                    padding: '10px 20px',
+                    backgroundColor: '#4f46e5',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px 16px',
+                    borderRadius: '6px',
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
                     fontSize: '14px',
                     fontWeight: '500'
                   }}
                 >
-                  <Download />
-                  Export All Data
+                  📥 Download Backup
                 </button>
               </div>
 
               {/* Import Section */}
               <div style={{
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '12px',
                 padding: '20px',
-                marginBottom: '20px'
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                backgroundColor: '#f9fafb'
               }}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#1e40af' }}>📥 Import Data</h4>
-                <p style={{ margin: '0 0 16px 0', color: '#2563eb', fontSize: '14px' }}>
-                  Restore from a previously exported backup file
+                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>📥 Import Data</h4>
+                <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>
+                  Restore data from a previously exported backup file.
                 </p>
                 <input
                   type="file"
                   accept=".json"
-                  onChange={(e) => {
-                    console.log('📥 Import file selected');
-                    const file = e.target.files[0];
-                    if (file) {
-                      onImportData && onImportData(file);
-                      e.target.value = '';
-                    }
-                  }}
-                  style={{ display: 'none' }}
-                  id="import-file"
-                />
-                <label
-                  htmlFor="import-file"
+                  onChange={handleFileImport}
                   style={{
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500'
+                    padding: '10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: 'white',
+                    width: '100%',
+                    fontSize: '14px'
                   }}
-                >
-                  <Upload />
-                  Choose Backup File
-                </label>
+                />
               </div>
 
               {/* Reset Section */}
               <div style={{
-                background: '#fef2f2',
+                padding: '20px',
                 border: '1px solid #fecaca',
-                borderRadius: '12px',
-                padding: '20px'
+                borderRadius: '8px',
+                backgroundColor: '#fef2f2'
               }}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#dc2626' }}>⚠️ Reset All Data</h4>
-                <p style={{ margin: '0 0 16px 0', color: '#ef4444', fontSize: '14px' }}>
-                  Permanently delete all tasks and reset to default settings
+                <h4 style={{ margin: '0 0 12px 0', color: '#dc2626' }}>⚠️ Reset All Data</h4>
+                <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>
+                  Permanently delete all tasks, categories, and settings. This action cannot be undone.
                 </p>
                 <button
-                  onClick={() => {
-                    console.log('🗑️ Reset clicked');
-                    if (window.confirm('Are you sure? This will delete ALL your tasks and cannot be undone!')) {
-                      if (window.confirm('Really delete everything? This action is permanent!')) {
-                        onResetData && onResetData();
-                      }
-                    }
-                  }}
+                  onClick={handleResetData}
                   style={{
-                    background: '#dc2626',
+                    padding: '10px 20px',
+                    backgroundColor: '#dc2626',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px 16px',
+                    borderRadius: '6px',
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
                     fontSize: '14px',
                     fontWeight: '500'
                   }}
                 >
-                  <AlertCircle />
-                  Reset Everything
+                  🗑️ Reset All Data
                 </button>
               </div>
             </div>
           )}
 
+          {/* Statistics Tab */}
           {activeTab === 'stats' && (
             <div>
-              <h3 style={{ margin: '0 0 24px 0', color: '#1f2937' }}>📊 Your Statistics</h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                {/* User Progress */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  textAlign: 'center'
-                }}>
-                  <h4 style={{ margin: '0 0 8px 0' }}>🏆 Progress</h4>
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '4px' }}>
-                    Level {1}
-                  </div>
-                  <div style={{ opacity: 0.9 }}>
-                    {0} points
-                  </div>
-                </div>
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: '#1f2937' }}>Task Statistics</h3>
+                <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+                  Overview of your task management data.
+                </p>
+              </div>
 
-                {/* Task Stats */}
+              {/* Stats Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '24px'
+              }}>
                 <div style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
                   padding: '20px',
+                  backgroundColor: '#eff6ff',
+                  borderRadius: '8px',
                   textAlign: 'center'
                 }}>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#1f2937' }}>📋 Tasks</h4>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#4f46e5', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#1e40af' }}>
                     {taskStats.total}
                   </div>
-                  <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                    Total Tasks
-                  </div>
+                  <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Tasks</div>
                 </div>
 
-                {/* Completion Rate */}
                 <div style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '12px',
                   padding: '20px',
+                  backgroundColor: '#f0fdf4',
+                  borderRadius: '8px',
                   textAlign: 'center'
                 }}>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#166534' }}>✅ Completed</h4>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#16a34a', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#15803d' }}>
                     {taskStats.completed}
                   </div>
-                  <div style={{ fontSize: '14px', color: '#15803d' }}>
-                    {taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}% Complete
-                  </div>
+                  <div style={{ fontSize: '14px', color: '#6b7280' }}>Completed</div>
                 </div>
 
-                {/* Active Tasks */}
                 <div style={{
-                  background: '#fef3c7',
-                  border: '1px solid #fcd34d',
-                  borderRadius: '12px',
                   padding: '20px',
+                  backgroundColor: '#fef3c7',
+                  borderRadius: '8px',
                   textAlign: 'center'
                 }}>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#92400e' }}>⚡ Active</h4>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#d97706', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#d97706' }}>
                     {taskStats.active}
                   </div>
-                  <div style={{ fontSize: '14px', color: '#92400e' }}>
-                    In Progress
+                  <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                </div>
+
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: taskStats.overdue > 0 ? '#fef2f2' : '#f3f4f6',
+                  borderRadius: '8px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ 
+                    fontSize: '32px', 
+                    fontWeight: 'bold', 
+                    color: taskStats.overdue > 0 ? '#dc2626' : '#6b7280' 
+                  }}>
+                    {taskStats.overdue}
                   </div>
+                  <div style={{ fontSize: '14px', color: '#6b7280' }}>Overdue</div>
                 </div>
               </div>
 
-              {/* Categories Overview */}
-              <div style={{ marginTop: '24px' }}>
-                <h4 style={{ margin: '0 0 16px 0', color: '#1f2937' }}>🏷️ Priority Categories</h4>
-                <div style={{ display: 'grid', gap: '8px' }}>
+              {/* Category Stats */}
+              <div style={{
+                padding: '20px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                backgroundColor: '#f9fafb'
+              }}>
+                <h4 style={{ margin: '0 0 16px 0', color: '#374151' }}>Priority Categories</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {categories.map(category => (
                     <div key={category.id} style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      padding: '12px 16px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px'
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      backgroundColor: 'white',
+                      borderRadius: '4px',
+                      border: '1px solid #e5e7eb'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '4px',
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
                           backgroundColor: category.color
                         }} />
-                        <span style={{ fontWeight: '500', color: '#1f2937' }}>
-                          {category.english}
-                        </span>
-                        <span style={{ fontSize: '14px', color: '#6b7280', direction: 'rtl' }}>
-                          {category.hebrew}
+                        <span style={{ fontSize: '14px', color: '#374151' }}>
+                          {category.english} ({category.hebrew})
                         </span>
                       </div>
-                      <span style={{ fontWeight: '600', color: '#4f46e5' }}>
+                      <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
                         {category.weight}%
                       </span>
                     </div>
@@ -787,59 +744,31 @@ const SettingsModal = ({
 
         {/* Footer */}
         <div style={{
-          padding: '20px 24px',
+          padding: '16px 24px',
           borderTop: '1px solid #e5e7eb',
-          background: '#f9fafb',
+          backgroundColor: '#f9fafb',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div>
-            {hasChanges && (
-              <span style={{ color: '#f59e0b', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <AlertCircle />
-                You have unsaved changes
-              </span>
-            )}
+          <div style={{ fontSize: '12px', color: '#6b7280' }}>
+            Priority Task Manager v2.0
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={handleClose}
-              style={{
-                background: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Cancel
-            </button>
-            {hasChanges && (
-              <button
-                onClick={handleSaveChanges}
-                style={{
-                  background: '#16a34a',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Save />
-                Save Changes
-              </button>
-            )}
-          </div>
+          <button
+            onClick={handleClose}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#374151',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

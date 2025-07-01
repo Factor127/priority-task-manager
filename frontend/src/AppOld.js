@@ -1,4 +1,4 @@
-// TaskForm.jsx - Fixed syntax errors and CSS imports
+//App.js file
 import React, { useState, useEffect } from 'react';
 import { X, Star, Save, Plus } from 'lucide-react';
 import TaskField from './components/ui/TaskField';

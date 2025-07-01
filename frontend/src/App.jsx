@@ -1,107 +1,26 @@
 import './styles/globals.css';
 import { ToastProvider } from './hooks/useToast';
 import ToastContainer from './components/ui/ToastContainer';
-import React, { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
-
-// Define AUTOSAVE_STATES locally as a fallback
-const LOCAL_AUTOSAVE_STATES = {
-  IDLE: 'idle',
-  SAVING: 'saving', 
-  SAVED: 'saved',
-  ERROR: 'error'
-};
-
-//import SettingsModal from './components/modals/SettingsModal';
-const SettingsModal = ({ isOpen, onClose }) => {
-  console.log('🧪 MEGA TEST MODAL: isOpen =', isOpen);
-  
-  // Use React Portal to escape any stacking context issues
-  const [portalContainer, setPortalContainer] = React.useState(null);
-  
-  React.useEffect(() => {
-    let container = document.getElementById('modal-portal');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'modal-portal';
-      container.style.cssText = `
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        z-index: 999999 !important;
-        pointer-events: none !important;
-      `;
-      document.body.appendChild(container);
-    }
-    setPortalContainer(container);
-  }, []);
-  
-  if (!portalContainer) return null;
-  
-  return ReactDOM.createPortal(
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'red',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 999999,
-      fontSize: '24px',
-      color: 'white',
-      fontWeight: 'bold',
-      pointerEvents: 'all'
-    }}>
-      <div style={{
-        background: 'blue',
-        padding: '60px',
-        borderRadius: '12px',
-        textAlign: 'center',
-        border: '5px solid yellow'
-      }}>
-        <h1 style={{color: 'white', fontSize: '36px'}}>🚨 PORTAL MODAL WORKING! 🚨</h1>
-        <p style={{color: 'white', fontSize: '20px'}}>This uses React Portal</p>
-        <button 
-          onClick={onClose}
-          style={{
-            padding: '20px 40px',
-            background: 'green',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '18px'
-          }}
-        >
-          CLOSE PORTAL MODAL
-        </button>
-      </div>
-    </div>,
-    portalContainer
-  );
-};
+import SettingsModal from './components/modals/SettingsModal';
 
 // Enhanced Autosave Indicator Component - FIXED
 const AutosaveIndicator = () => {
   const context = useApp();
   
-  // Use local fallback if AUTOSAVE_STATES is not available from context
-    const AUTOSAVE_STATES = {
+  // Define AUTOSAVE_STATES directly in component as safety measure
+  const AUTOSAVE_STATES = {
     IDLE: 'idle',
     SAVING: 'saving', 
     SAVED: 'saved',
     ERROR: 'error'
   };
-    const overallSaveState = context?.overallSaveState || AUTOSAVE_STATES.IDLE;
-
+  
+  // Use context value or fallback to IDLE
+  const overallSaveState = context?.overallSaveState || AUTOSAVE_STATES.IDLE;
 
   const getIndicatorContent = () => {
     switch (overallSaveState) {
@@ -147,7 +66,7 @@ const AutosaveIndicator = () => {
   const { text, color, background, borderColor, showDot, pulsing } = getIndicatorContent();
 
   return (
-     <div style={{
+    <div style={{
       fontSize: '12px',
       color: color,
       background: background,
@@ -699,29 +618,24 @@ const PriorityTaskManager = () => {
     try {
       console.log('Saving task data:', taskData);
       
-      // Process the task data to ensure proper formats
       const processedData = {
         ...taskData,
-        // Handle due date - keep as string if provided
         dueDate: taskData.dueDate || null,
-        // Ensure priority ratings exist
         priorityRatings: taskData.priorityRatings || {},
       };
       
       if (editingTask) {
-        // Editing existing task - ensure we keep the original ID
         const updatedTask = {
           ...processedData,
-          id: editingTask.id, // Preserve original ID
+          id: editingTask.id,
           updatedAt: new Date().toISOString()
         };
         setTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t));
         showToast(`Task "${taskData.title}" updated successfully!`);
       } else {
-        // Creating new task - generate new ID
         const newTask = {
           ...processedData,
-          id: Date.now(), // Generate unique ID
+          id: Date.now(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -802,13 +716,6 @@ const PriorityTaskManager = () => {
     setStatusFilter('all');
   };
 
-  // Settings handler
-  const handleShowSettings = () => {
-    console.log('✅ handleShowSettings called, current showSettings:', showSettings);
-    setShowSettings(true);
-    console.log('✅ Settings modal should open now');
-  };
-
   const taskStats = getTaskStats();
   const filteredTasks = getFilteredTasks();
   const hasFilters = searchQuery || statusFilter !== 'all';
@@ -818,7 +725,7 @@ const PriorityTaskManager = () => {
       <Header
         onCreateTask={handleCreateTask}
         onShowFiles={() => setShowFileManager(true)}
-        onShowSettings={handleShowSettings}
+        onShowSettings={() => setShowSettings(true)}
         onForceSave={() => {
           if (forceSave) {
             forceSave();
@@ -891,10 +798,13 @@ const PriorityTaskManager = () => {
       {showSettings && (
         <SettingsModal
           isOpen={showSettings}
-          onClose={() => {
-            console.log('Settings modal closing');
-            setShowSettings(false);
-          }}
+          onClose={() => setShowSettings(false)}
+          priorityCategories={priorityCategories}
+          onUpdateCategories={handleUpdateCategories}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+          onResetData={handleResetData}
+          taskStats={taskStats}
         />
       )}
 
@@ -914,42 +824,11 @@ const PriorityTaskManager = () => {
           {toast.message}
         </div>
       )}
-
-      {/* Debug Info Panel */}
-      <div style={{ 
-        background: 'white', 
-        borderRadius: '12px', 
-        padding: '20px', 
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-        marginTop: '20px'
-      }}>
-        <h3>🎯 App Status</h3>
-        <p>✅ Settings Modal State: {showSettings ? 'OPEN' : 'CLOSED'}</p>
-        <p>✅ Priority Categories: {priorityCategories?.length || 0} loaded</p>
-        <p>✅ Export/Import Functions: {exportAllData && importAllData ? 'Available' : 'Missing'}</p>
-        <p style={{ color: '#10b981', fontWeight: 'bold' }}>
-          🎯 Multi-Project Mode • {taskStats.total} tasks
-        </p>
-        <button 
-          onClick={handleShowSettings}
-          style={{
-            padding: '8px 16px',
-            background: '#4f46e5',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            marginTop: '10px'
-          }}
-        >
-          🧪 Test Settings Button
-        </button>
-      </div>
     </div>
   );
 };
 
-// Main App with both providers
+// Main App with providers
 function App() {
   return (
     <ToastProvider>
