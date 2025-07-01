@@ -5,6 +5,106 @@ import TaskField from './ui/TaskField';
 import App from './App';
 // import styles from './TaskForm.module.css'; // Comment out if CSS module doesn't exist
 
+useEffect(() => {
+    // Global error handler
+    const handleGlobalError = (event) => {
+        console.error('Global error:', event.error);
+        // Prevent default browser error handling
+        event.preventDefault();
+    };
+
+    const handleUnhandledRejection = (event) => {
+        console.error('Unhandled promise rejection:', event.reason);
+        // Prevent default browser error handling
+        event.preventDefault();
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+        window.removeEventListener('error', handleGlobalError);
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+}, []);
+useEffect(() => {
+    // Monitor performance
+    const startTime = performance.now();
+    
+    return () => {
+        const endTime = performance.now();
+        const renderTime = endTime - startTime;
+        if (renderTime > 1000) {
+            console.warn(`Slow app render: ${renderTime}ms`);
+        }
+    };
+}, []);
+class AppErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+    }
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error('App Error:', error, errorInfo);
+        this.setState({ error, errorInfo });
+        
+        // Save error for debugging
+        try {
+            localStorage.setItem('lastAppError', JSON.stringify({
+                error: error.message,
+                stack: error.stack,
+                errorInfo,
+                timestamp: new Date().toISOString()
+            }));
+        } catch (e) {
+            console.error('Failed to save error info');
+        }
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{
+                    padding: '20px',
+                    textAlign: 'center',
+                    backgroundColor: '#fff5f5',
+                    border: '1px solid #fed7d7',
+                    borderRadius: '8px',
+                    margin: '20px'
+                }}>
+                    <h2>Something went wrong</h2>
+                    <p>The app encountered an error. Your data is safe.</p>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#4f46e5',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Reload App
+                    </button>
+                    <details style={{ marginTop: '20px', textAlign: 'left' }}>
+                        <summary>Error Details</summary>
+                        <pre style={{ fontSize: '12px', overflow: 'auto' }}>
+                            {this.state.error && this.state.error.toString()}
+                        </pre>
+                    </details>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
 const TaskForm = ({
   isOpen = false,
   onClose,

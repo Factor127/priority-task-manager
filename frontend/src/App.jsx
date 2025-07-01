@@ -1,11 +1,12 @@
+import './styles/globals.css';
+import { ToastProvider } from './hooks/useToast';
+import ToastContainer from './components/ui/ToastContainer';
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
-import './styles/globals.css';
-import { ToastProvider } from './hooks/useToast';
-import ToastContainer from './components/ui/ToastContainer';
+
 //import SettingsModal from './components/modals/SettingsModal';
 const SettingsModal = ({ isOpen, onClose }) => {
   console.log('🧪 MEGA TEST MODAL: isOpen =', isOpen);

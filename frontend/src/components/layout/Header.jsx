@@ -1,5 +1,5 @@
 // Header.jsx - Fixed with proper IDs and accessibility
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const AutosaveIndicator = ({ overallSaveState, AUTOSAVE_STATES }) => {
     const getIndicatorContent = () => {
@@ -75,12 +75,12 @@ const AutosaveIndicator = ({ overallSaveState, AUTOSAVE_STATES }) => {
     );
 };
 
-const Header = ({ onCreateTask, onShowFiles, onShowSettings, onForceSave, overallSaveState, AUTOSAVE_STATES }) => {
+const Header = ({ level, points, saveState, onCreateTask, onShowFiles, onShowSettings, onForceSave, overallSaveState, AUTOSAVE_STATES }) => {
     // Generate unique IDs for buttons
-    const createTaskBtnId = `create-task-btn-${Math.random().toString(36).substr(2, 9)}`;
-    const filesBtnId = `files-btn-${Math.random().toString(36).substr(2, 9)}`;
-    const settingsBtnId = `settings-btn-${Math.random().toString(36).substr(2, 9)}`;
-    const saveBtnId = `save-btn-${Math.random().toString(36).substr(2, 9)}`;
+    const createTaskBtnId = `create-task-${Date.now()}`;
+const filesBtnId = `files-${Date.now()}`;
+const settingsBtnId = `settings-${Date.now()}`;
+const saveBtnId = `save-${Date.now()}`;
 
     const headerStyle = {
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -139,7 +139,8 @@ const Header = ({ onCreateTask, onShowFiles, onShowSettings, onForceSave, overal
         border: '1px solid rgba(255, 255, 255, 0.3)'
     };
 
-    return (
+    try {
+        return (
         <header style={headerStyle} role="banner">
             <div style={logoStyle}>
                 <h1 style={{ margin: 0, fontSize: '24px' }}>
@@ -196,8 +197,16 @@ const Header = ({ onCreateTask, onShowFiles, onShowSettings, onForceSave, overal
                     💾 Save Now
                 </button>
             </nav>
+                </header>
+    );
+} catch (error) {
+    console.error('Header render error:', error);
+    return (
+        <header style={headerStyle}>
+            <div style={{ color: 'red' }}>Header Error - Please refresh</div>
         </header>
     );
+}
 };
 
 export default Header;

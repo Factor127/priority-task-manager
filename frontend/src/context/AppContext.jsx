@@ -12,26 +12,134 @@ const AUTOSAVE_STATES = {
 };
 
 const DEFAULT_PRIORITY_CATEGORIES = [
-    { id: 'income', english: 'Income/Revenue', hebrew: 'הכנסה לשוטף', weight: 40, color: '#10B981' },
-    { id: 'home', english: 'Home Management', hebrew: 'ניהול בית', weight: 15, color: '#3B82F6' },
-    { id: 'plan', english: '5-Year Plan', hebrew: 'תוכנית חומש', weight: 5, color: '#8B5CF6' },
-    { id: 'social', english: 'Social', hebrew: 'סוציאל', weight: 20, color: '#F59E0B' },
-    { id: 'relationship', english: 'Relationship', hebrew: 'זוגיות', weight: 5, color: '#EF4444' },
-    { id: 'personal', english: 'Personal', hebrew: 'עצמי', weight: 20, color: '#06B6D4' },
-    { id: 'children', english: 'Children', hebrew: 'ילדים', weight: 30, color: '#84CC16' }
+    { id: 'income', hebrew: 'הכנסה לשוטף', english: 'Income/Revenue', weight: 40, color: '#10B981' },
+    { id: 'home', hebrew: 'ניהול בית', english: 'Home Management', weight: 15, color: '#3B82F6' },
+    { id: 'plan', hebrew: 'תוכנית חומש', english: '5-Year Plan', weight: 5, color: '#8B5CF6' },
+    { id: 'social', hebrew: 'סוציאל', english: 'Social', weight: 20, color: '#F59E0B' },
+    { id: 'relationship', hebrew: 'זוגיות', english: 'Relationship', weight: 5, color: '#EF4444' },
+    { id: 'personal', hebrew: 'עצמי', english: 'Personal', weight: 20, color: '#06B6D4' },
+    { id: 'children', hebrew: 'ילדים', english: 'Children', weight: 30, color: '#84CC16' }
 ];
 
 const DEFAULT_PROJECTS = [
-    'Personal Development',
-    'Business Growth', 
-    'Family',
-    'Health',
-    'Learning',
-    'Finance'
+    'Personal Development', 'Business Growth', 'Family', 
+    'Health', 'Learning', 'Finance'
 ];
 
 // =================
-// CONTEXT CREATION
+// SAFE LOCALSTORAGE FUNCTIONS
+// =================
+
+const safeLoadFromStorage = (key, defaultValue) => {
+    try {
+        const item = localStorage.getItem(key);
+        
+        // Handle all possible corrupted states
+        if (!item || item === 'undefined' || item === 'null' || item === '') {
+            console.log(`localStorage key "${key}" is empty, using default`);
+            return defaultValue;
+        }
+        
+        const parsed = JSON.parse(item);
+        
+        // Validate data structure
+        if (parsed === null || parsed === undefined) {
+            console.log(`localStorage key "${key}" contains null/undefined, using default`);
+            return defaultValue;
+        }
+        
+        return parsed;
+    } catch (error) {
+        console.error(`localStorage corruption detected for "${key}":`, error);
+        
+        // Try to recover from backup
+        try {
+            const backupKey = `${key}_backup`;
+            const backup = localStorage.getItem(backupKey);
+            if (backup && backup !== 'undefined') {
+                const backupData = JSON.parse(backup);
+                console.log(`Recovered data from backup for "${key}"`);
+                return backupData;
+            }
+        } catch (backupError) {
+            console.error('Backup also corrupted');
+        }
+        
+        // Clear corrupted data and use default
+        try {
+            localStorage.removeItem(key);
+        } catch (clearError) {
+            console.error('Failed to clear corrupted data');
+        }
+        
+        return defaultValue;
+    }
+};
+
+const safeSaveToStorage = async (key, data) => {
+    // Create a lock to prevent concurrent saves
+    const lockKey = `${key}_lock`;
+    const lockTimeout = 5000; // 5 second timeout
+    
+    try {
+        // Check for existing lock
+        const existingLock = localStorage.getItem(lockKey);
+        if (existingLock) {
+            const lockTime = parseInt(existingLock);
+            const now = Date.now();
+            
+            // If lock is older than timeout, clear it
+            if (now - lockTime > lockTimeout) {
+                localStorage.removeItem(lockKey);
+            } else {
+                throw new Error('Save operation already in progress');
+            }
+        }
+        
+        // Set lock
+        localStorage.setItem(lockKey, Date.now().toString());
+        
+        // Create backup before saving
+        const existing = localStorage.getItem(key);
+        if (existing && existing !== 'undefined') {
+            localStorage.setItem(`${key}_backup`, existing);
+        }
+        
+        // Convert to JSON
+        const jsonString = JSON.stringify(data);
+        
+        // Check size (5MB limit for localStorage)
+        const sizeInBytes = new Blob([jsonString]).size;
+        if (sizeInBytes > 5 * 1024 * 1024) {
+            throw new Error('Data too large for localStorage');
+        }
+        
+        // Save data
+        localStorage.setItem(key, jsonString);
+        
+        // Verify save
+        const saved = localStorage.getItem(key);
+        if (saved !== jsonString) {
+            throw new Error('Data verification failed after save');
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error(`Failed to save "${key}":`, error);
+        throw error;
+    } finally {
+        // Always release lock
+        try {
+            localStorage.removeItem(lockKey);
+        } catch (lockError) {
+            console.error('Failed to release save lock');
+        }
+    }
+};
+
+// =================
+// CONTEXT SETUP
 // =================
 
 const AppContext = createContext();
@@ -39,407 +147,195 @@ const AppContext = createContext();
 export const useApp = () => {
     const context = useContext(AppContext);
     if (!context) {
-        throw new Error('useApp must be used within an AppProvider');
+        throw new Error('useApp must be used within AppProvider');
     }
     return context;
 };
 
-// =================
-// PROVIDER COMPONENT
-// =================
-
 export const AppProvider = ({ children }) => {
-    // Multi-project state
+    // Core data state
     const [projects, setProjects] = useState({});
-    const [currentProjectId, setCurrentProjectId] = useState('family');
-    const [overallSaveState, setOverallSaveState] = useState(AUTOSAVE_STATES.IDLE);
+    const [currentProjectId, setCurrentProjectId] = useState('default');
+    const [priorityCategories, setPriorityCategories] = useState(DEFAULT_PRIORITY_CATEGORIES);
+    const [savedProjects, setSavedProjects] = useState(DEFAULT_PROJECTS);
+    const [userProgress, setUserProgress] = useState({ points: 0, level: 1 });
     
-    // Derived state for current project
-    const currentProject = projects[currentProjectId] || null;
-    const tasks = currentProject?.tasks || [];
-    const priorityCategories = currentProject?.priorityCategories || DEFAULT_PRIORITY_CATEGORIES;
-    const savedProjects = currentProject?.savedProjects || DEFAULT_PROJECTS;
-
-    // Auto-save state management
+    // UI state
+    const [overallSaveState, setOverallSaveState] = useState(AUTOSAVE_STATES.IDLE);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+    // Refs for cleanup
     const saveTimeoutRef = useRef(null);
     const lastSaveRef = useRef(Date.now());
+    const isInitialLoadRef = useRef(true);
 
     // =================
     // INITIALIZATION
     // =================
 
     useEffect(() => {
-        console.log('🔧 Initializing multi-project system...');
-        
-        // Load existing data and migrate if needed
-        const existingTasks = loadFromLocalStorage('priorityTasks', []);
-        const existingCategories = loadFromLocalStorage('priorityCategories', DEFAULT_PRIORITY_CATEGORIES);
-        const existingProjects = loadFromLocalStorage('savedProjects', DEFAULT_PROJECTS);
-        const lastProject = loadFromLocalStorage('currentProject', 'family');
-        
-        // Load multi-project data or create from existing
-        let initialProjects = loadFromLocalStorage('multiProjects', {});
-        
-        // Migration: If we have old single-project data, migrate it
-        if (Object.keys(initialProjects).length === 0 && existingTasks.length > 0) {
-            console.log('🔄 Migrating existing data to multi-project format...');
-            initialProjects = {
-                family: {
-                    id: 'family',
-                    name: 'Family',
-                    tasks: existingTasks,
-                    priorityCategories: existingCategories,
-                    savedProjects: existingProjects,
-                    createdAt: new Date().toISOString()
-                }
-            };
-        }
-        
-        // Ensure we have at least default projects
-        if (Object.keys(initialProjects).length === 0) {
-            console.log('🏗️ Creating default projects...');
-            initialProjects = {
-                family: {
-                    id: 'family',
-                    name: 'Family',
-                    tasks: [],
-                    priorityCategories: [...DEFAULT_PRIORITY_CATEGORIES],
-                    savedProjects: [...DEFAULT_PROJECTS],
-                    createdAt: new Date().toISOString()
-                },
-                work: {
-                    id: 'work', 
-                    name: 'Work',
-                    tasks: [],
-                    priorityCategories: [
-                        { id: 'revenue', english: 'Revenue Impact', hebrew: 'השפעה על הכנסות', weight: 35, color: '#10B981' },
-                        { id: 'efficiency', english: 'Efficiency', hebrew: 'יעילות', weight: 25, color: '#3B82F6' },
-                        { id: 'growth', english: 'Growth', hebrew: 'צמיחה', weight: 20, color: '#8B5CF6' },
-                        { id: 'urgent', english: 'Urgency', hebrew: 'דחיפות', weight: 20, color: '#EF4444' }
-                    ],
-                    savedProjects: ['Client Work', 'Internal Projects', 'Training', 'Administration'],
-                    createdAt: new Date().toISOString()
-                },
-                personal: {
-                    id: 'personal',
-                    name: 'Personal',
-                    tasks: [],
-                    priorityCategories: [
-                        { id: 'health', english: 'Health', hebrew: 'בריאות', weight: 30, color: '#10B981' },
-                        { id: 'relationships', english: 'Relationships', hebrew: 'יחסים', weight: 25, color: '#EF4444' },
-                        { id: 'growth', english: 'Personal Growth', hebrew: 'צמיחה אישית', weight: 25, color: '#8B5CF6' },
-                        { id: 'fun', english: 'Fun & Recreation', hebrew: 'בילוי ונופש', weight: 20, color: '#F59E0B' }
-                    ],
-                    savedProjects: ['Fitness', 'Learning', 'Hobbies', 'Social'],
-                    createdAt: new Date().toISOString()
-                }
-            };
-        }
-        
-        setProjects(initialProjects);
-        setCurrentProjectId(lastProject);
-        
-        console.log(`✅ Loaded ${Object.keys(initialProjects).length} projects, current: ${lastProject}`);
-    }, []);
-
-    // =================
-    // UTILITY FUNCTIONS
-    // =================
-
-    const loadFromLocalStorage = useCallback((key, defaultValue) => {
-        try {
-            const item = localStorage.getItem(key);
-            if (item && item !== 'undefined' && item !== 'null') {
-                return JSON.parse(item);
+        const initializeApp = async () => {
+            try {
+                setIsLoading(true);
+                
+                // Load all data safely
+                const loadedProjects = safeLoadFromStorage('multiProjects', { default: { name: 'Main Project', tasks: [] } });
+                const loadedCurrentProject = safeLoadFromStorage('currentProject', 'default');
+                const loadedCategories = safeLoadFromStorage('priorityCategories', DEFAULT_PRIORITY_CATEGORIES);
+                const loadedSavedProjects = safeLoadFromStorage('savedProjects', DEFAULT_PROJECTS);
+                const loadedProgress = safeLoadFromStorage('userProgress', { points: 0, level: 1 });
+                
+                setProjects(loadedProjects);
+                setCurrentProjectId(loadedCurrentProject);
+                setPriorityCategories(loadedCategories);
+                setSavedProjects(loadedSavedProjects);
+                setUserProgress(loadedProgress);
+                
+                isInitialLoadRef.current = false;
+                
+            } catch (error) {
+                console.error('Failed to initialize app:', error);
+                setError('Failed to load saved data. Using defaults.');
+            } finally {
+                setIsLoading(false);
             }
-        } catch (error) {
-            console.warn(`LocalStorage key "${key}" is empty, using default value`, error);
-        }
-        return defaultValue;
-    }, []);
+        };
 
-    const saveToLocalStorage = useCallback((key, value) => {
-        try {
-            localStorage.setItem(key, JSON.stringify(value));
-            return true;
-        } catch (error) {
-            console.error(`Failed to save to localStorage key "${key}":`, error);
-            return false;
-        }
+        initializeApp();
     }, []);
 
     // =================
     // AUTO-SAVE SYSTEM
     // =================
 
+    const performSave = useCallback(async () => {
+        if (isInitialLoadRef.current) return;
+        
+        try {
+            setOverallSaveState(AUTOSAVE_STATES.SAVING);
+            
+            // Save all data with safe method
+            await safeSaveToStorage('multiProjects', projects);
+            await safeSaveToStorage('currentProject', currentProjectId);
+            await safeSaveToStorage('priorityCategories', priorityCategories);
+            await safeSaveToStorage('savedProjects', savedProjects);
+            await safeSaveToStorage('userProgress', userProgress);
+            
+            setOverallSaveState(AUTOSAVE_STATES.SAVED);
+            lastSaveRef.current = Date.now();
+            
+            // Auto-return to idle after 2 seconds
+            setTimeout(() => {
+                setOverallSaveState(AUTOSAVE_STATES.IDLE);
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Auto-save failed:', error);
+            setOverallSaveState(AUTOSAVE_STATES.ERROR);
+            setError('Failed to save data. Your changes may not be preserved.');
+            
+            // Auto-return to idle after 5 seconds
+            setTimeout(() => {
+                setOverallSaveState(AUTOSAVE_STATES.IDLE);
+                setError(null);
+            }, 5000);
+        }
+    }, [projects, currentProjectId, priorityCategories, savedProjects, userProgress]);
+
     const debouncedSave = useCallback(() => {
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
 
-        setOverallSaveState(AUTOSAVE_STATES.SAVING);
-
         saveTimeoutRef.current = setTimeout(() => {
-            try {
-                // Save multi-project data
-                const success1 = saveToLocalStorage('multiProjects', projects);
-                const success2 = saveToLocalStorage('currentProject', currentProjectId);
-                
-                if (success1 && success2) {
-                    setOverallSaveState(AUTOSAVE_STATES.SAVED);
-                    lastSaveRef.current = Date.now();
-                    
-                    setTimeout(() => {
-                        setOverallSaveState(AUTOSAVE_STATES.IDLE);
-                    }, 2000);
-                } else {
-                    setOverallSaveState(AUTOSAVE_STATES.ERROR);
-                }
-            } catch (error) {
-                console.error('Auto-save failed:', error);
-                setOverallSaveState(AUTOSAVE_STATES.ERROR);
-            }
+            performSave();
         }, 800);
-    }, [projects, currentProjectId, saveToLocalStorage]);
+    }, [performSave]);
 
     // Trigger auto-save when data changes
     useEffect(() => {
-        if (Object.keys(projects).length > 0) {
+        if (!isInitialLoadRef.current && Object.keys(projects).length > 0) {
             debouncedSave();
         }
-    }, [projects, currentProjectId, debouncedSave]);
+    }, [projects, currentProjectId, priorityCategories, savedProjects, userProgress, debouncedSave]);
 
-    // =================
-    // PROJECT MANAGEMENT
-    // =================
-
-    const createProject = useCallback((projectData) => {
-        const newId = Date.now().toString();
-        const newProject = {
-            id: newId,
-            name: projectData.name,
-            tasks: [],
-            priorityCategories: projectData.priorityCategories || [...DEFAULT_PRIORITY_CATEGORIES],
-            savedProjects: [...DEFAULT_PROJECTS],
-            createdAt: new Date().toISOString()
-        };
-        
-        setProjects(prev => ({
-            ...prev,
-            [newId]: newProject
-        }));
-        
-        return newId;
-    }, []);
-
-    const deleteProject = useCallback((projectId) => {
-        setProjects(prev => {
-            const newProjects = { ...prev };
-            delete newProjects[projectId];
-            return newProjects;
-        });
-        
-        // Switch to first available project if current was deleted
-        if (projectId === currentProjectId) {
-            const remainingIds = Object.keys(projects).filter(id => id !== projectId);
-            if (remainingIds.length > 0) {
-                setCurrentProjectId(remainingIds[0]);
-            }
-        }
-    }, [currentProjectId, projects]);
-
-    const updateProject = useCallback((projectId, updates) => {
-        setProjects(prev => ({
-            ...prev,
-            [projectId]: {
-                ...prev[projectId],
-                ...updates,
-                updatedAt: new Date().toISOString()
-            }
-        }));
-    }, []);
-
-    const switchProject = useCallback((projectId) => {
-        if (projects[projectId]) {
-            setCurrentProjectId(projectId);
-            console.log(`🔄 Switched to project: ${projects[projectId].name}`);
-        }
-    }, [projects]);
-
-    // =================
-    // CURRENT PROJECT OPERATIONS
-    // =================
-
-    const setTasks = useCallback((tasksOrUpdater) => {
-        if (!currentProjectId || !projects[currentProjectId]) return;
-        
-        const newTasks = typeof tasksOrUpdater === 'function' 
-            ? tasksOrUpdater(projects[currentProjectId].tasks)
-            : tasksOrUpdater;
-            
-        updateProject(currentProjectId, { tasks: newTasks });
-    }, [currentProjectId, projects, updateProject]);
-
-    const setPriorityCategories = useCallback((categoriesOrUpdater) => {
-        if (!currentProjectId || !projects[currentProjectId]) return;
-        
-        const newCategories = typeof categoriesOrUpdater === 'function'
-            ? categoriesOrUpdater(projects[currentProjectId].priorityCategories)
-            : categoriesOrUpdater;
-            
-        updateProject(currentProjectId, { priorityCategories: newCategories });
-    }, [currentProjectId, projects, updateProject]);
-
-    const setSavedProjects = useCallback((projectsOrUpdater) => {
-        if (!currentProjectId || !projects[currentProjectId]) return;
-        
-        const newSavedProjects = typeof projectsOrUpdater === 'function'
-            ? projectsOrUpdater(projects[currentProjectId].savedProjects)
-            : projectsOrUpdater;
-            
-        updateProject(currentProjectId, { savedProjects: newSavedProjects });
-    }, [currentProjectId, projects, updateProject]);
-
-    // =================
-    // EXPORT/IMPORT
-    // =================
-
-    const exportAllData = useCallback(() => {
-        try {
-            const exportData = {
-                projects,
-                currentProjectId,
-                exportDate: new Date().toISOString(),
-                version: '2.0'
-            };
-            
-            const dataStr = JSON.stringify(exportData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `priority-tasks-multiproject-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            return 'Multi-project data exported successfully!';
-        } catch (error) {
-            console.error('Export failed:', error);
-            return 'Export failed: ' + error.message;
-        }
-    }, [projects, currentProjectId]);
-
-    const importAllData = useCallback((importData) => {
-        try {
-            if (importData.version === '2.0' && importData.projects) {
-                // Multi-project format
-                setProjects(importData.projects);
-                setCurrentProjectId(importData.currentProjectId || Object.keys(importData.projects)[0]);
-                return `Imported ${Object.keys(importData.projects).length} projects successfully!`;
-            } else if (importData.tasks) {
-                // Legacy single-project format - import into current project
-                if (currentProjectId && projects[currentProjectId]) {
-                    updateProject(currentProjectId, {
-                        tasks: importData.tasks,
-                        priorityCategories: importData.priorityCategories || priorityCategories
-                    });
-                    return 'Legacy data imported into current project!';
-                }
-            }
-            return 'Invalid import format';
-        } catch (error) {
-            console.error('Import failed:', error);
-            return 'Import failed: ' + error.message;
-        }
-    }, [currentProjectId, projects, priorityCategories, updateProject]);
-
-    // =================
-    // FORCE SAVE
-    // =================
-
+    // Force save function
     const forceSave = useCallback(() => {
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
-        
-        setOverallSaveState(AUTOSAVE_STATES.SAVING);
-        
-        try {
-            const success1 = saveToLocalStorage('multiProjects', projects);
-            const success2 = saveToLocalStorage('currentProject', currentProjectId);
-            
-            if (success1 && success2) {
-                setOverallSaveState(AUTOSAVE_STATES.SAVED);
-                lastSaveRef.current = Date.now();
-                
-                setTimeout(() => {
-                    setOverallSaveState(AUTOSAVE_STATES.IDLE);
-                }, 2000);
-            } else {
-                setOverallSaveState(AUTOSAVE_STATES.ERROR);
+        performSave();
+    }, [performSave]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
             }
-        } catch (error) {
-            console.error('Force save failed:', error);
-            setOverallSaveState(AUTOSAVE_STATES.ERROR);
-        }
-    }, [projects, currentProjectId, saveToLocalStorage]);
+        };
+    }, []);
+
+    // =================
+    // COMPUTED VALUES
+    // =================
+
+    const currentProject = useMemo(() => {
+        return projects[currentProjectId] || { name: 'Main Project', tasks: [] };
+    }, [projects, currentProjectId]);
+
+    const tasks = useMemo(() => {
+        return currentProject.tasks || [];
+    }, [currentProject]);
 
     // =================
     // CONTEXT VALUE
     // =================
 
-    const contextValue = useMemo(() => ({
-        // Multi-project state
+    const contextValue = {
+        // Data
         projects,
+        setProjects,
         currentProjectId,
-        currentProject,
-        
-        // Current project data (for backward compatibility)
-        tasks,
-        priorityCategories,
-        savedProjects,
-        
-        // Project management
-        createProject,
-        deleteProject,
-        updateProject,
-        switchProject,
-        
-        // Current project operations  
-        setTasks,
-        setPriorityCategories,
-        setSavedProjects,
-        
-        // Auto-save
-        overallSaveState,
-        forceSave,
-        AUTOSAVE_STATES,
-        
-        // Export/Import
-        exportAllData,
-        importAllData
-    }), [
-        projects,
-        currentProjectId,
+        setCurrentProjectId,
         currentProject,
         tasks,
         priorityCategories,
-        savedProjects,
-        createProject,
-        deleteProject,
-        updateProject,
-        switchProject,
-        setTasks,
         setPriorityCategories,
+        savedProjects,
         setSavedProjects,
-        overallSaveState,
+        userProgress,
+        setUserProgress,
+        
+        // UI State
+        saveState: overallSaveState,
+        isLoading,
+        error,
+        setError,
+        
+        // Actions
         forceSave,
-        exportAllData,
-        importAllData
-    ]);
+        
+        // Export/Import functions (will be added later)
+        exportAllData: () => {},
+        importAllData: () => {}
+    };
+
+    if (isLoading) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                fontSize: '18px',
+                color: '#6b7280'
+            }}>
+                Loading Priority Task Manager...
+            </div>
+        );
+    }
 
     return (
         <AppContext.Provider value={contextValue}>
@@ -447,3 +343,5 @@ export const AppProvider = ({ children }) => {
         </AppContext.Provider>
     );
 };
+
+export default AppProvider;
