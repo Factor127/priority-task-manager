@@ -1,12 +1,44 @@
+// Enhanced App.jsx with automatic task priority recalculation when settings change
+
 import './styles/globals.css';
 import { ToastProvider } from './hooks/useToast';
 import ToastContainer from './components/ui/ToastContainer';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
 import SettingsModal from './components/modals/SettingsModal';
 import generateUniqueId from './utils/idGenerator';
+
+// Priority calculation utility function
+const calculateTaskPriorityScore = (task, categories) => {
+  let score = 0;
+  
+  // Calculate base score from ratings and category weights
+  categories.forEach(category => {
+    const rating = task.priorityRatings?.[category.id] || 0;
+    const weight = category.weight || 0;
+    score += (rating * weight) / 100;
+  });
+
+  // Add urgency bonus for due date
+  if (task.dueDate) {
+    const today = new Date();
+    const dueDate = new Date(task.dueDate);
+    const diffTime = dueDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) {
+      score += 50; // Overdue or due today
+    } else if (diffDays <= 3) {
+      score += 30; // Due in 1-3 days
+    } else if (diffDays <= 7) {
+      score += 15; // Due in 4-7 days
+    }
+  }
+
+  return Math.round(score * 10) / 10;
+};
 
 // Enhanced Autosave Indicator Component - FIXED
 const AutosaveIndicator = () => {
@@ -402,6 +434,11 @@ const EnhancedTaskCard = ({ task, onEdit, onComplete, onDelete }) => {
               </span>
             )}
             {task.type && <span>🏗️ {task.type}</span>}
+            {task.priorityScore && (
+              <span style={{ color: '#4f46e5', fontWeight: '600' }}>
+                ⭐ {task.priorityScore}
+              </span>
+            )}
           </div>
 
           {task.goal && (
@@ -557,6 +594,31 @@ const PriorityTaskManager = () => {
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   };
 
+  // 🔧 ENHANCED: Recalculate all task priority scores when categories change
+  const recalculateAllTaskPriorities = (newCategories) => {
+    console.log('🔄 Recalculating all task priorities with new categories');
+    
+    setTasks(prevTasks => {
+      const updatedTasks = prevTasks.map(task => {
+        // Only recalculate if task has priority ratings
+        if (task.priorityRatings && Object.keys(task.priorityRatings).length > 0) {
+          const newScore = calculateTaskPriorityScore(task, newCategories);
+          console.log(`📊 Task "${task.title}": ${task.priorityScore || 0} → ${newScore}`);
+          
+          return {
+            ...task,
+            priorityScore: newScore,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return task;
+      });
+      
+      console.log('✅ Priority recalculation complete');
+      return updatedTasks;
+    });
+  };
+
   // Calculate task statistics
   const getTaskStats = () => {
     const total = tasks.length;
@@ -592,6 +654,9 @@ const PriorityTaskManager = () => {
       filtered = filtered.filter(task => task.status === 'הושלם');
     }
 
+    // Sort by priority score (highest first)
+    filtered.sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
+
     return filtered;
   };
 
@@ -622,6 +687,7 @@ const PriorityTaskManager = () => {
         ...taskData,
         dueDate: taskData.dueDate || null,
         priorityRatings: taskData.priorityRatings || {},
+        priorityScore: calculateTaskPriorityScore(taskData, priorityCategories)
       };
       
       if (editingTask) {
@@ -669,11 +735,17 @@ const PriorityTaskManager = () => {
     }
   };
 
-  // Settings handlers
+  // 🔧 ENHANCED: Settings handlers with priority recalculation
   const handleUpdateCategories = (newCategories) => {
     console.log('🔧 handleUpdateCategories called with:', newCategories);
+    
+    // Update categories first
     setPriorityCategories(newCategories);
-    showToast('Priority categories updated successfully!');
+    
+    // Then recalculate all task priorities
+    recalculateAllTaskPriorities(newCategories);
+    
+    showToast('Priority categories updated and task scores recalculated!');
   };
 
   const handleExportData = () => {

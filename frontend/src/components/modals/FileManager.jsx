@@ -9,7 +9,7 @@ const FileManager = ({ isOpen, onClose }) => {
     importAllData,
     projects,
     currentProjectId,
-    setProjects
+    setTasks
   } = useApp();
   
   const [importType, setImportType] = useState('json');
@@ -249,78 +249,46 @@ const FileManager = ({ isOpen, onClose }) => {
 
   // MAIN IMPORT FUNCTION with duplicate detection
   const performImport = (tasksToImport) => {
-    console.log('🔧 Performing import with', tasksToImport.length, 'tasks');
+  console.log('🔧 Performing import with', tasksToImport.length, 'tasks');
+  
+  const existingTasks = tasks || [];
+  
+  // Check for duplicates by title
+  const { duplicates, uniqueTasks } = findDuplicates(tasksToImport, existingTasks);
+  
+  if (duplicates.length > 0) {
+    console.log('⚠️ Found', duplicates.length, 'duplicate tasks');
     
-    if (projects && currentProjectId && projects[currentProjectId] && setProjects) {
-      const currentProject = projects[currentProjectId];
-      const existingTasks = currentProject.tasks || [];
-      
-      // Check for duplicates by title
-      const { duplicates, uniqueTasks } = findDuplicates(tasksToImport, existingTasks);
-      
-      if (duplicates.length > 0) {
-        console.log('⚠️ Found', duplicates.length, 'duplicate tasks');
+    // Show duplicate dialog
+    setDuplicateDialog({
+      show: true,
+      duplicates,
+      newTasks: uniqueTasks,
+      onResolve: (duplicateResolution) => {
+        // Combine unique tasks with resolved duplicates
+        const allTasksToAdd = [...uniqueTasks, ...duplicateResolution];
         
-        // Show duplicate dialog
-        setDuplicateDialog({
-          show: true,
-          duplicates,
-          newTasks: uniqueTasks,
-          onResolve: (duplicateResolution) => {
-            // Combine unique tasks with resolved duplicates
-            const allTasksToAdd = [...uniqueTasks, ...duplicateResolution];
-            
-            console.log('📊 Final import summary:', {
-              unique: uniqueTasks.length,
-              duplicateResolution: duplicateResolution.length,
-              total: allTasksToAdd.length
-            });
-            
-            if (allTasksToAdd.length > 0) {
-              // Update project with all tasks
-              const updatedTasks = [...existingTasks, ...allTasksToAdd];
-              
-              const updatedProject = {
-                ...currentProject,
-                tasks: updatedTasks,
-                updatedAt: new Date().toISOString()
-              };
-              
-              setProjects(prev => ({
-                ...prev,
-                [currentProjectId]: updatedProject
-              }));
-              
-              showToast(`Successfully imported ${allTasksToAdd.length} tasks! (${uniqueTasks.length} unique, ${duplicateResolution.length} duplicates processed)`);
-            } else {
-              showToast('No new tasks imported (all were skipped duplicates)', 'info');
-            }
-          }
-        });
-        
-        return; // Exit here - will continue after user resolves duplicates
+        if (allTasksToAdd.length > 0) {
+          // Use setTasks instead of setProjects
+          setTasks(prev => [...prev, ...allTasksToAdd]);
+          showToast(`Successfully imported ${allTasksToAdd.length} tasks!`);
+        } else {
+          showToast('No new tasks imported (all were skipped duplicates)', 'info');
+        }
       }
-      
-      // No duplicates - proceed with direct import
-      console.log('✅ No duplicates found, proceeding with direct import');
-      
-      const updatedProject = {
-        ...currentProject,
-        tasks: [...existingTasks, ...uniqueTasks],
-        updatedAt: new Date().toISOString()
-      };
-      
-      setProjects(prev => ({
-        ...prev,
-        [currentProjectId]: updatedProject
-      }));
-      
-      showToast(`Successfully imported ${uniqueTasks.length} new tasks!`);
-      
-    } else {
-      throw new Error('Cannot access project data for import. Please check if the project is properly loaded.');
-    }
-  };
+    });
+    
+    return;
+  }
+  
+  // No duplicates - proceed with direct import
+  if (uniqueTasks.length > 0) {
+    setTasks(prev => [...prev, ...uniqueTasks]);
+    showToast(`Successfully imported ${uniqueTasks.length} new tasks!`);
+  } else {
+    showToast('No tasks to import', 'info');
+  }
+};
 
   // MAIN IMPORT HANDLER
   const handleTaskImport = (event) => {
@@ -601,8 +569,7 @@ const FileManager = ({ isOpen, onClose }) => {
           <strong>🔧 Enhanced Import:</strong> Project: {currentProjectId} | 
           Tasks: {tasks.length} | 
           Duplicate Detection: ✅ Active |
-          Ready: {!!(projects && currentProjectId && setProjects) ? '✅' : '❌'}
-        </div>
+Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </div>
 
         {/* Task Import Section */}
         <div style={{
