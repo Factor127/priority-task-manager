@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
 
 const TaskForm = ({
   isOpen = false,
   onClose,
   onSubmit,
-  onSave, // Alternative prop name used in your App.jsx
-  onCancel, // Alternative prop name used in your App.jsx
+  onSave, // Alternative prop name
+  onCancel, // Alternative prop name
   task = null,
   savedProjects = [],
   priorityCategories = [],
@@ -63,16 +62,9 @@ const TaskForm = ({
   }, [task, isOpen]);
 
   const handleInputChange = (fieldName, value) => {
-    let sanitizedValue = value;
-    if (typeof value === 'string') {
-      sanitizedValue = value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-      sanitizedValue = sanitizedValue.replace(/javascript:/gi, '');
-      sanitizedValue = sanitizedValue.replace(/on\w+="[^"]*"/gi, '');
-    }
-    
     setFormData(prev => ({
       ...prev,
-      [fieldName]: sanitizedValue
+      [fieldName]: value
     }));
 
     if (errors[fieldName]) {
@@ -84,12 +76,10 @@ const TaskForm = ({
   };
 
   const isValidUrl = (string) => {
+    if (!string) return true; // Empty is valid
     try {
-      const url = new URL(string);
-      if (url.protocol === 'javascript:' || url.protocol === 'data:' || url.protocol === 'vbscript:') {
-        return false;
-      }
-      return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:';
+      new URL(string);
+      return true;
     } catch (_) {
       return false;
     }
@@ -100,26 +90,12 @@ const TaskForm = ({
 
     if (!formData.title.trim()) {
       newErrors.title = 'Task title is required';
-    } else if (formData.title.trim().length > 200) {
-      newErrors.title = 'Task title must be less than 200 characters';
     } else if (formData.title.trim().length < 2) {
       newErrors.title = 'Task title must be at least 2 characters';
     }
 
-    if (formData.goal && formData.goal.length > 1000) {
-      newErrors.goal = 'Goal description must be less than 1000 characters';
-    }
-
-    if (formData.update && formData.update.length > 1000) {
-      newErrors.update = 'Update description must be less than 1000 characters';
-    }
-
     if (formData.link && !isValidUrl(formData.link)) {
       newErrors.link = 'Please enter a valid URL';
-    }
-
-    if (formData.isRepeating && !formData.repeatInterval) {
-      newErrors.repeatInterval = 'Repeat interval is required for repeating tasks';
     }
 
     setErrors(newErrors);
@@ -138,13 +114,7 @@ const TaskForm = ({
     try {
       const taskData = {
         ...formData,
-        dueDate: formData.dueDate ? (() => {
-          const date = new Date(formData.dueDate);
-          if (isNaN(date.getTime())) {
-            throw new Error('Invalid date selected');
-          }
-          return date.toISOString();
-        })() : null,
+        dueDate: formData.dueDate || null,
         isRepeating: Boolean(formData.isRepeating),
         updatedAt: new Date().toISOString(),
         ...(task ? {} : { createdAt: new Date().toISOString() })
@@ -194,7 +164,8 @@ const TaskForm = ({
     };
   }, [isOpen]);
 
-  // Inline styles since CSS modules might not be available
+  if (!isOpen) return null;
+
   const styles = {
     overlay: {
       position: 'fixed',
@@ -267,6 +238,15 @@ const TaskForm = ({
       minHeight: '60px',
       boxSizing: 'border-box'
     },
+    select: {
+      width: '100%',
+      padding: '8px 12px',
+      border: '1px solid #d1d5db',
+      borderRadius: '6px',
+      fontSize: '14px',
+      boxSizing: 'border-box',
+      backgroundColor: 'white'
+    },
     error: {
       color: '#dc2626',
       fontSize: '12px',
@@ -299,8 +279,6 @@ const TaskForm = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
     <div style={styles.overlay} onClick={handleClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -314,7 +292,7 @@ const TaskForm = ({
             style={styles.closeButton}
             disabled={isSubmitting}
           >
-            <X size={20} />
+            ✕
           </button>
         </div>
 
@@ -340,7 +318,13 @@ const TaskForm = ({
                 onChange={(e) => handleInputChange('project', e.target.value)}
                 style={styles.input}
                 placeholder="Project name..."
+                list="projects-list"
               />
+              <datalist id="projects-list">
+                {savedProjects.map((project, index) => (
+                  <option key={index} value={project} />
+                ))}
+              </datalist>
             </div>
 
             <div style={styles.fieldGroup}>
@@ -351,7 +335,6 @@ const TaskForm = ({
                 style={styles.textarea}
                 placeholder="Describe the goal..."
               />
-              {errors.goal && <div style={styles.error}>{errors.goal}</div>}
             </div>
 
             <div style={styles.fieldGroup}>
@@ -362,7 +345,6 @@ const TaskForm = ({
                 style={styles.textarea}
                 placeholder="Add notes..."
               />
-              {errors.update && <div style={styles.error}>{errors.update}</div>}
             </div>
 
             <div style={styles.fieldGroup}>
@@ -370,11 +352,12 @@ const TaskForm = ({
               <select
                 value={formData.status}
                 onChange={(e) => handleInputChange('status', e.target.value)}
-                style={styles.input}
+                style={styles.select}
               >
                 <option value="לא התחיל">לא התחיל</option>
                 <option value="בעבודה">בעבודה</option>
                 <option value="הושלם">הושלם</option>
+                <option value="מושהה">מושהה</option>
               </select>
             </div>
 
@@ -423,8 +406,7 @@ const TaskForm = ({
             >
               {isSubmitting ? 'Saving...' : (
                 <>
-                  <Save size={16} />
-                  {task ? 'Update Task' : 'Create Task'}
+                  💾 {task ? 'Update Task' : 'Create Task'}
                 </>
               )}
             </button>
