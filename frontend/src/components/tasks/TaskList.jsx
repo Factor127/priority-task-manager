@@ -4,6 +4,17 @@ import TaskCard from './TaskCard';
 import EmptyState from '../ui/EmptyState';
 import styles from './TaskList.module.css';
 
+const generateStableKey = (task, index) => {
+  // Ensure we have a valid task ID
+  if (!task.id || typeof task.id !== 'string') {
+    console.warn('Task missing valid ID, using index fallback:', task);
+    return `fallback-${index}-${task.title?.slice(0, 10) || 'untitled'}`;
+  }
+  
+  // Use just the task ID - it should be unique
+  return task.id;
+};
+
 const TaskList = ({
   tasks = [],
   loading = false,
@@ -162,103 +173,146 @@ const TaskList = ({
   };
 
   return (
-    <div className={`${styles.taskList} ${className}`}>
-      {/* Task Stats Header */}
-      {!loading && !error && tasks.length > 0 && (
-        <div className={styles.statsHeader}>
-          <div className={styles.statsGrid}>
-            <div className={styles.statItem}>
-              <span className={styles.statNumber}>{stats.total}</span>
-              <span className={styles.statLabel}>Total</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statNumber}>{stats.active}</span>
-              <span className={styles.statLabel}>Active</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statNumber}>{stats.completed}</span>
-              <span className={styles.statLabel}>Completed</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={`${styles.statNumber} ${stats.overdue > 0 ? styles.overdue : ''}`}>
-                {stats.overdue}
-              </span>
-              <span className={styles.statLabel}>Overdue</span>
-            </div>
+  <div className={`${styles.taskList} ${className}`}>
+    {/* Task Stats Header */}
+    {!loading && !error && tasks.length > 0 && (
+      <div className={styles.statsHeader}>
+        <div className={styles.statsGrid}>
+          <div className={styles.statItem}>
+            <span className={styles.statNumber}>{stats.total}</span>
+            <span className={styles.statLabel}>Total</span>
           </div>
-
-          {/* Filter Summary */}
-          {(searchQuery || statusFilter !== 'all' || projectFilter) && (
-            <div className={styles.filterSummary}>
-              <span className={styles.showingText}>
-                Showing {filteredAndSortedTasks.length} of {tasks.length} tasks
-              </span>
-              {searchQuery && (
-                <span className={styles.filterTag}>
-                  Search: "{searchQuery}"
-                </span>
-              )}
-              {statusFilter !== 'all' && (
-                <span className={styles.filterTag}>
-                  Status: {statusFilter}
-                </span>
-              )}
-              {projectFilter && projectFilter !== 'all' && (
-                <span className={styles.filterTag}>
-                  Project: {projectFilter}
-                </span>
-              )}
-              <button 
-                className={styles.clearFiltersBtn}
-                onClick={() => handleEmptyStateAction('clear-filters')}
-                title="Clear all filters"
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
+          <div className={styles.statItem}>
+            <span className={styles.statNumber}>{stats.active}</span>
+            <span className={styles.statLabel}>Active</span>
+          </div>
+          <div className={styles.statItem}>
+            <span className={styles.statNumber}>{stats.completed}</span>
+            <span className={styles.statLabel}>Completed</span>
+          </div>
+          <div className={styles.statItem}>
+            <span className={`${styles.statNumber} ${stats.overdue > 0 ? styles.overdue : ''}`}>
+              {stats.overdue}
+            </span>
+            <span className={styles.statLabel}>Overdue</span>
+          </div>
         </div>
-      )}
 
-      {/* Task Cards or Empty State */}
-      <div className={styles.taskContainer}>
-        {emptyStateType ? (
-          <EmptyState
-            type={emptyStateType}
-            onAction={handleEmptyStateAction}
-            searchQuery={searchQuery}
-            hasFilters={statusFilter !== 'all' || projectFilter}
-            error={error}
-          />
-        ) : (
-          <div className={styles.taskCards}>
-            {filteredAndSortedTasks.map((task, index) => (
-              <TaskCard
-                key={`${task.id}_${task.createdAt || Date.now()}_${index}`} 
-                task={task}
-                onUpdate={onTaskUpdate}
-                onDelete={onTaskDelete}
-                onToggleComplete={onTaskToggleComplete}
-                onRatePriority={onRatePriority}
-                savedProjects={savedProjects}
-                priorityCategories={priorityCategories}
-                className={index === 0 ? styles.firstCard : ''}
-              />
-            ))}
+        {/* Filter Summary */}
+        {(searchQuery || statusFilter !== 'all' || projectFilter) && (
+          <div className={styles.filterSummary}>
+            <span className={styles.showingText}>
+              Showing {filteredAndSortedTasks.length} of {tasks.length} tasks
+            </span>
+            {searchQuery && (
+              <span className={styles.filterTag}>
+                Search: "{searchQuery}"
+              </span>
+            )}
+            {statusFilter !== 'all' && (
+              <span className={styles.filterTag}>
+                Status: {statusFilter}
+              </span>
+            )}
+            {projectFilter && projectFilter !== 'all' && (
+              <span className={styles.filterTag}>
+                Project: {projectFilter}
+              </span>
+            )}
+            <button 
+              className={styles.clearFiltersBtn}
+              onClick={() => handleEmptyStateAction('clear-filters')}
+              title="Clear all filters"
+            >
+              Clear filters
+            </button>
           </div>
         )}
       </div>
+    )}
 
-      {/* Performance hint for large lists */}
-      {filteredAndSortedTasks.length > 50 && (
-        <div className={styles.performanceHint}>
-          <span className={styles.hintText}>
-            💡 Tip: Use search or filters to find tasks faster when you have many items
-          </span>
+    {/* Task Cards or Empty State */}
+    <div className={styles.taskContainer}>
+      {emptyStateType ? (
+        <EmptyState
+          type={emptyStateType}
+          onAction={handleEmptyStateAction}
+          searchQuery={searchQuery}
+          hasFilters={statusFilter !== 'all' || projectFilter}
+          error={error}
+        />
+      ) : (
+        <div className={styles.taskCards}>
+          {filteredAndSortedTasks.map((task, index) => (
+            <TaskCard
+              key={generateStableKey(task, index)} // ✅ FIXED: Simple, stable key
+              task={task}
+              onUpdate={onTaskUpdate}
+              onDelete={onTaskDelete}
+              onToggleComplete={onTaskToggleComplete}
+              onRatePriority={onRatePriority}
+              savedProjects={savedProjects}
+              priorityCategories={priorityCategories}
+              className={index === 0 ? styles.firstCard : ''}
+            />
+          ))}
         </div>
       )}
     </div>
-  );
+
+    {/* Performance hint for large lists */}
+    {filteredAndSortedTasks.length > 50 && (
+      <div className={styles.performanceHint}>
+        <span className={styles.hintText}>
+          💡 Tip: Use search or filters to find tasks faster when you have many items
+        </span>
+      </div>
+    )}
+
+    {/* Debug info in development */}
+    {process.env.NODE_ENV === 'development' && (
+      <div className={styles.debugInfo} style={{ 
+        marginTop: '1rem', 
+        padding: '0.5rem', 
+        background: '#f3f4f6', 
+        fontSize: '0.75rem',
+        borderRadius: '0.25rem'
+      }}>
+        <details>
+          <summary style={{ cursor: 'pointer' }}>🔍 Debug Info</summary>
+          <div style={{ marginTop: '0.5rem' }}>
+            <p>📊 Total tasks: {tasks.length}</p>
+            <p>🎯 Filtered tasks: {filteredAndSortedTasks.length}</p>
+            <p>🆔 Unique task IDs: {new Set(filteredAndSortedTasks.map(t => t.id)).size}</p>
+            {new Set(filteredAndSortedTasks.map(t => t.id)).size !== filteredAndSortedTasks.length && (
+              <p style={{ color: 'red' }}>⚠️ DUPLICATE IDs DETECTED!</p>
+            )}
+          </div>
+        </details>
+      </div>
+    )}
+  </div>
+);
+
+// Alternative: If you prefer a more robust approach with validation
+const generateValidatedKey = (task, index, allTasks) => {
+  // Check for valid ID
+  if (!task.id || typeof task.id !== 'string') {
+    console.warn(`Task at index ${index} has invalid ID:`, task.id);
+    return `invalid-id-${index}-${task.title?.replace(/\s+/g, '-').slice(0, 20) || 'untitled'}`;
+  }
+  
+  // Check for duplicate IDs in the current list
+  const sameIdTasks = allTasks.filter(t => t.id === task.id);
+  if (sameIdTasks.length > 1) {
+    console.warn(`Duplicate ID found: ${task.id}`);
+    // Find which occurrence this is
+    const occurrence = sameIdTasks.indexOf(task);
+    return `${task.id}-dup-${occurrence}`;
+  }
+  
+  return task.id;
 };
 
-export default TaskList;
+// Usage with validation:
+// key={generateValidatedKey(task, index, filteredAndSortedTasks)}

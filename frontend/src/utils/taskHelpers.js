@@ -1,3 +1,96 @@
+// utils/taskHelpers.js - Enhanced with better ID generation
+
+// Generate unique task ID using crypto API or fallback
+export const generateUniqueId = () => {
+  // Use crypto.randomUUID if available (modern browsers)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback: timestamp + high-entropy random string
+  const timestamp = Date.now();
+  const randomPart = Math.random().toString(36).substring(2, 15) + 
+                    Math.random().toString(36).substring(2, 15);
+  
+  return `${timestamp}_${randomPart}`;
+};
+
+// Enhanced task creation with guaranteed unique ID
+export const createTaskWithUniqueId = (taskData, existingTasks = []) => {
+  let newId;
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  // Ensure the ID is truly unique by checking against existing tasks
+  do {
+    newId = generateUniqueId();
+    attempts++;
+    
+    if (attempts > maxAttempts) {
+      // Fallback to UUID-like format if we somehow can't generate unique ID
+      newId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
+      break;
+    }
+  } while (existingTasks.some(task => task.id === newId));
+  
+  return {
+    id: newId,
+    title: taskData.title || '',
+    project: taskData.project || '',
+    goal: taskData.goal || '',
+    update: taskData.update || '',
+    type: taskData.type || 'מנהלה',
+    status: taskData.status || 'לא התחיל',
+    dueDate: taskData.dueDate || null,
+    isRepeating: taskData.isRepeating || false,
+    repeatInterval: taskData.repeatInterval || '',
+    link: taskData.link || '',
+    priorityRatings: taskData.priorityRatings || {},
+    createdAt: taskData.createdAt || new Date().toISOString(),
+    updatedAt: taskData.updatedAt || new Date().toISOString(),
+    completedAt: taskData.completedAt || null
+  };
+};
+
+// Remove duplicate tasks from array (by ID)
+export const removeDuplicateTasks = (tasks) => {
+  const seen = new Set();
+  return tasks.filter(task => {
+    if (seen.has(task.id)) {
+      console.warn(`Duplicate task ID found and removed: ${task.id}`);
+      return false;
+    }
+    seen.add(task.id);
+    return true;
+  });
+};
+
+// Validate and clean task array
+export const validateAndCleanTasks = (tasks) => {
+  if (!Array.isArray(tasks)) {
+    console.error('Tasks must be an array');
+    return [];
+  }
+  
+  // Remove duplicates
+  const uniqueTasks = removeDuplicateTasks(tasks);
+  
+  // Ensure all tasks have valid IDs
+  const validatedTasks = uniqueTasks.map(task => {
+    if (!task.id || typeof task.id !== 'string') {
+      console.warn('Task missing valid ID, generating new one:', task);
+      return {
+        ...task,
+        id: generateUniqueId(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+    return task;
+  });
+  
+  return validatedTasks;
+};
+
 // Task constants (same as your original)
 export const TASK_TYPES = [
     'מנהלה', 'שותפות', 'שיווק', 'תשתית', 
