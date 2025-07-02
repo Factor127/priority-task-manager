@@ -234,7 +234,7 @@ const TaskList = ({
           <div className={styles.taskCards}>
             {filteredAndSortedTasks.map((task, index) => (
               <TaskCard
-                key={task.id}
+                key={`${task.id}_${task.createdAt || Date.now()}_${index}`} 
                 task={task}
                 onUpdate={onTaskUpdate}
                 onDelete={onTaskDelete}

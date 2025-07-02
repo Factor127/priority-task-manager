@@ -9,7 +9,9 @@ const FileManager = ({ isOpen, onClose }) => {
     importAllData,
     projects,
     currentProjectId,
-    setTasks
+    setTasks,
+    savedProjects,        // ✅ ADD THIS
+    setSavedProjects      // ✅ ADD THIS
   } = useApp();
   
   const [importType, setImportType] = useState('json');
@@ -291,83 +293,201 @@ const FileManager = ({ isOpen, onClose }) => {
 };
 
   // MAIN IMPORT HANDLER
-  const handleTaskImport = (event) => {
+  // Updated import logic for FileManager.jsx
+
+const handleTaskImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    console.log('🚀 Starting import with duplicate detection:', { 
-      fileName: file.name, 
-      fileType: file.type, 
-      importType,
-      currentProjectId,
-      currentTaskCount: tasks.length
+    console.log('🚀 Starting import with duplicate detection:', {
+        fileName: file.name,
+        fileType: file.type,
+        importType,
+        currentProjectId: 'default',
+        currentTaskCount: tasks.length
     });
-    
+
     showToast('Starting import...', 'info');
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
-        let tasksToImport = [];
-        
-        if (importType === 'json') {
-          console.log('📄 Processing JSON file...');
-          const data = JSON.parse(e.target.result);
-          
-          if (Array.isArray(data)) {
-            console.log('✅ JSON is direct array format');
-            tasksToImport = data;
-          } else if (data.tasks && Array.isArray(data.tasks)) {
-            console.log('✅ JSON has tasks property');
-            tasksToImport = data.tasks;
-          } else {
-            throw new Error('Invalid JSON format. Expected array of tasks or object with tasks property.');
-          }
-          
-        } else if (importType === 'csv') {
-          console.log('📊 Processing CSV file...');
-          const csvTasks = parseCSV(e.target.result);
-          
-          if (csvTasks.length === 0) {
-            throw new Error('No valid tasks found in CSV file');
-          }
-          
-          console.log('🔄 Converting CSV tasks...');
-          tasksToImport = csvTasks.map(csvTask => convertCSVTask(csvTask, priorityCategories));
+        try {
+            let importedTasks = [];
+            
+            console.log('📄 Processing JSON file...');
+            
+            if (importType === 'json') {
+                const data = JSON.parse(e.target.result);
+                console.log('✅ JSON is direct array format');
+                importedTasks = Array.isArray(data) ? data : (data.tasks || []);
+            } else if (importType === 'csv') {
+                const csvTasks = parseCSV(e.target.result);
+                importedTasks = csvTasks.map(csvTask => convertCSVTask(csvTask, priorityCategories));
+            }
+            
+            if (importedTasks.length > 0) {
+                console.log(`📥 Processing ${importedTasks.length} tasks for import...`);
+                performImportWithDuplicateDetection(importedTasks);
+            } else {
+                showToast('No valid tasks found in the file.', 'error');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            showToast(`Error importing file: ${error.message}`, 'error');
         }
-        
-        if (tasksToImport.length === 0) {
-          throw new Error('No tasks found in the file');
-        }
-
-        console.log('📥 Processing', tasksToImport.length, 'tasks for import...');
-        
-        // Ensure proper task format with guaranteed unique IDs
-        const processedTasks = tasksToImport.map(task => ({
-          ...task,
-          id: task.id ? task.id + '_' + Math.random().toString(36).substr(2, 9) : Date.now() + Math.random(),
-          createdAt: task.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          priorityRatings: task.priorityRatings || {}
-        }));
-
-        // Perform import with duplicate detection
-        performImport(processedTasks);
-
-      } catch (error) {
-        console.error('❌ Import error:', error);
-        showToast(`Import failed: ${error.message}`, 'error');
-      }
     };
-    
-    reader.onerror = () => {
-      console.error('❌ File reading error');
-      showToast('Failed to read file', 'error');
-    };
-    
     reader.readAsText(file);
     event.target.value = '';
-  };
+};
+
+const performImportWithDuplicateDetection = (importedTasks) => {
+    console.log('🔧 Performing import with', importedTasks.length, 'tasks');
+    
+    // Enhanced duplicate detection
+    const duplicateResults = checkForDuplicatesEnhanced(importedTasks, tasks);
+    console.log('🔍 Enhanced duplicate check results:', duplicateResults);
+    
+    if (duplicateResults.duplicates > 0) {
+        console.log('⚠️ Found', duplicateResults.duplicates, 'duplicate tasks');
+        
+        // For this fix, we'll use 'replace' action to resolve duplicates
+        const resolution = resolveDuplicates(duplicateResults, 'replace');
+        console.log('📊 Duplicate resolution result:', resolution);
+        
+        if (resolution.action === 'replace') {
+            // CRITICAL FIX: Ensure all tasks have unique IDs and React keys
+            const tasksToAdd = resolution.tasksToAdd.map((task, index) => {
+                const uniqueId = generateUniqueId(); // Generate truly unique ID
+                return {
+                    ...task,
+                    id: uniqueId,
+                    reactKey: `${uniqueId}_${Date.now()}_${index}`, // Ensure unique React key
+                    createdAt: task.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+            });
+            
+            // Remove existing duplicates first, then add new ones
+            const existingTaskIds = resolution.existingTaskIds || [];
+            const filteredExistingTasks = tasks.filter(task => !existingTaskIds.includes(task.id));
+            
+            // Set the new task list with guaranteed unique keys
+            setTasks([...filteredExistingTasks, ...tasksToAdd]);
+            
+            // Add new projects
+            const newProjects = tasksToAdd
+                .map(task => task.project)
+                .filter(project => project && !savedProjects.includes(project));
+            
+            if (newProjects.length > 0) {
+                setSavedProjects(prev => [...prev, ...newProjects]);
+            }
+            
+            showToast(`Successfully imported ${importedTasks.length} tasks!`, 'success');
+        }
+    } else {
+        // No duplicates - add all tasks with unique IDs
+        const tasksWithUniqueIds = importedTasks.map((task, index) => {
+            const uniqueId = generateUniqueId();
+            return {
+                ...task,
+                id: uniqueId,
+                reactKey: `${uniqueId}_${Date.now()}_${index}`, // Unique React key
+                createdAt: task.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+        });
+        
+        setTasks(prev => [...prev, ...tasksWithUniqueIds]);
+        
+        // Add new projects
+        const newProjects = tasksWithUniqueIds
+            .map(task => task.project)
+            .filter(project => project && !savedProjects.includes(project));
+        
+        if (newProjects.length > 0) {
+            setSavedProjects(prev => [...prev, ...newProjects]);
+        }
+        
+        showToast(`Successfully imported ${tasksWithUniqueIds.length} tasks!`, 'success');
+    }
+};
+
+// Helper function to generate truly unique IDs
+const generateUniqueId = () => {
+    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// Enhanced duplicate checking function
+const checkForDuplicatesEnhanced = (importedTasks, existingTasks) => {
+    console.log('🔍 Checking for duplicates by title and ID...');
+    
+    const duplicates = [];
+    const unique = [];
+    const duplicateBreakdown = {
+        byTitle: 0,
+        byId: 0,
+        byBoth: 0
+    };
+    
+    importedTasks.forEach(importedTask => {
+        const duplicateByTitle = existingTasks.find(existing => 
+            existing.title && importedTask.title && 
+            existing.title.trim().toLowerCase() === importedTask.title.trim().toLowerCase()
+        );
+        
+        const duplicateById = existingTasks.find(existing => 
+            existing.id && importedTask.id && existing.id === importedTask.id
+        );
+        
+        if (duplicateByTitle || duplicateById) {
+            duplicates.push({
+                imported: importedTask,
+                existing: duplicateByTitle || duplicateById,
+                matchType: duplicateByTitle && duplicateById ? 'both' : 
+                          (duplicateByTitle ? 'title' : 'id')
+            });
+            
+            if (duplicateByTitle && duplicateById) duplicateBreakdown.byBoth++;
+            else if (duplicateByTitle) duplicateBreakdown.byTitle++;
+            else duplicateBreakdown.byId++;
+        } else {
+            unique.push(importedTask);
+        }
+    });
+    
+    return {
+        total: importedTasks.length,
+        duplicates: duplicates.length,
+        unique: unique.length,
+        duplicateBreakdown,
+        duplicateList: duplicates,
+        uniqueList: unique
+    };
+};
+
+// Resolve duplicates function
+const resolveDuplicates = (duplicateResults, action) => {
+    console.log('🔧 Resolving duplicates with action:', action);
+    
+    if (action === 'replace') {
+        console.log('🔄 Replacing existing tasks with imported data');
+        
+        const existingTaskIds = duplicateResults.duplicateList.map(dup => dup.existing.id);
+        const tasksToAdd = duplicateResults.duplicateList.map(dup => dup.imported)
+            .concat(duplicateResults.uniqueList);
+        
+        return {
+            action: 'replace',
+            tasksToAdd,
+            existingTaskIds,
+            allUniqueIds: true
+        };
+    }
+    
+    // Add other resolution strategies here if needed
+    return { action, tasksToAdd: [], existingTaskIds: [] };
+};
 
   // Generate CSV for export
   const generateTasksCSV = (tasks, categories) => {

@@ -106,7 +106,7 @@ const TaskListContainer = ({
       <div className={styles.taskList}>
         {filteredTasks.map(task => (
           <TaskCard
-            key={task.id}
+            key={`${task.id}_${task.createdAt || Date.now()}_${index}`} 
             task={task}
             onUpdate={onUpdateTask}
             onDelete={onDeleteTask}

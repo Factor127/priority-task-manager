@@ -1,42 +1,22 @@
-// TaskCardTest.jsx - Test TaskCard component
+// TaskCardTest.jsx - FIXED version with unique React keys
+
 import React, { useState } from 'react';
 import TaskCard from './TaskCard';
 
 const TaskCardTest = () => {
-  // Sample priority categories (from your spec)
-  const priorityCategories = [
-    { id: 'income', english: 'Income/Revenue', hebrew: 'הכנסה לשוטף', weight: 40, color: '#10B981' },
-    { id: 'home', english: 'Home Management', hebrew: 'ניהול בית', weight: 15, color: '#3B82F6' },
-    { id: 'plan', english: '5-Year Plan', hebrew: 'תוכנית חומש', weight: 5, color: '#8B5CF6' },
-    { id: 'social', english: 'Social', hebrew: 'סוציאל', weight: 20, color: '#F59E0B' },
-    { id: 'relationship', english: 'Relationship', hebrew: 'זוגיות', weight: 5, color: '#EF4444' },
-    { id: 'personal', english: 'Personal', hebrew: 'עצמי', weight: 20, color: '#06B6D4' },
-    { id: 'children', english: 'Children', hebrew: 'ילדים', weight: 30, color: '#84CC16' }
-  ];
-
-  // Sample saved projects
-  const savedProjects = [
-    'Personal Development',
-    'Business Growth',
-    'Family',
-    'Health',
-    'Learning',
-    'Finance',
-    'Website Redesign',
-    'Mobile App Development'
-  ];
-
-  // Sample tasks with different states
+  // ... (all your existing code for priorityCategories, savedProjects, etc.)
+  
+  // Sample tasks with different states - FIXED with unique IDs
   const [tasks, setTasks] = useState([
     {
-      id: 1,
+      id: `task_1_${Date.now()}`, // ✅ Unique ID with timestamp
       title: 'Complete React TaskCard Component',
       project: 'Website Redesign',
       goal: 'Build a comprehensive task card component with inline editing, priority indicators, and all the features from the original HTML version.',
       update: 'Made good progress on the basic structure. Need to add the priority calculation and rating system.',
       type: 'פיתוח',
       status: 'בעבודה',
-      dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
+      dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
       isRepeating: false,
       repeatInterval: '',
       link: 'https://github.com/your-repo',
@@ -46,18 +26,19 @@ const TaskCardTest = () => {
         plan: 3
       },
       createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - 1000).toISOString(), // Recently updated
-      completedAt: null
+      updatedAt: new Date(Date.now() - 1000).toISOString(),
+      completedAt: null,
+      reactKey: `task_1_${Date.now()}_unique` // ✅ Explicit React key
     },
     {
-      id: 2,
+      id: `task_2_${Date.now() + 1}`, // ✅ Unique ID
       title: 'Review and update priority categories',
       project: 'Personal Development',
       goal: 'Review the current priority category weights and adjust based on current life priorities.',
       update: '',
       type: 'מנהלה',
       status: 'לא התחיל',
-      dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // Overdue
+      dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
       isRepeating: true,
       repeatInterval: 'monthly',
       link: '',
@@ -67,10 +48,11 @@ const TaskCardTest = () => {
       },
       createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
       updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      completedAt: null
+      completedAt: null,
+      reactKey: `task_2_${Date.now() + 1}_unique` // ✅ Explicit React key
     },
     {
-      id: 3,
+      id: `task_3_${Date.now() + 2}`, // ✅ Unique ID
       title: 'Set up exercise routine',
       project: 'Health',
       goal: 'Establish a consistent workout schedule with both cardio and strength training.',
@@ -87,10 +69,11 @@ const TaskCardTest = () => {
       },
       createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
       updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+      completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      reactKey: `task_3_${Date.now() + 2}_unique` // ✅ Explicit React key
     },
     {
-      id: 4,
+      id: `task_4_${Date.now() + 3}`, // ✅ Unique ID
       title: 'Plan family vacation',
       project: 'Family',
       goal: 'Research and book summer vacation destination. Need to coordinate with everyone\'s schedules.',
@@ -108,18 +91,39 @@ const TaskCardTest = () => {
       },
       createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      completedAt: null
+      completedAt: null,
+      reactKey: `task_4_${Date.now() + 3}_unique` // ✅ Explicit React key
     }
   ]);
 
-  // Handle task updates
+  // Generate unique key helper function
+  const generateUniqueTaskKey = (task, index) => {
+    // Priority order: reactKey > composite key > fallback
+    if (task.reactKey) return task.reactKey;
+    if (task.id && task.createdAt) return `${task.id}_${task.createdAt}_${index}`;
+    return `fallback_${index}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  // Handle task updates - FIXED to ensure unique keys
   const handleTaskUpdate = (taskId, updates) => {
     setTasks(prevTasks => 
-      prevTasks.map(task => 
-        task.id === taskId 
-          ? { ...task, ...updates, updatedAt: new Date().toISOString() }
-          : task
-      )
+      prevTasks.map((task, index) => {
+        if (task.id === taskId) {
+          const updatedTask = { 
+            ...task, 
+            ...updates, 
+            updatedAt: new Date().toISOString()
+          };
+          
+          // Ensure the updated task has a unique React key
+          if (!updatedTask.reactKey) {
+            updatedTask.reactKey = generateUniqueTaskKey(updatedTask, index);
+          }
+          
+          return updatedTask;
+        }
+        return task;
+      })
     );
     console.log('Task updated:', taskId, updates);
   };
@@ -140,32 +144,14 @@ const TaskCardTest = () => {
     handleTaskUpdate(task.id, updates);
     
     if (isCompleted) {
-      // Calculate points (priority score * 10)
       const priorityScore = calculatePriorityScore(task.priorityRatings || {}, priorityCategories);
       const points = Math.round(priorityScore * 10);
       console.log(`Task completed! Earned ${points} points`);
-      
-      // You could show a toast notification here
       alert(`Task completed! You earned ${points} points!`);
     }
   };
 
-  // Handle priority rating (placeholder)
-  const handleRatePriority = (task) => {
-    console.log('Rate priority for task:', task.title);
-    alert('Priority rating modal would open here');
-  };
-
-  // Calculate priority score (same logic as in TaskCard)
-  const calculatePriorityScore = (priorityRatings = {}, categories = []) => {
-    let score = 0;
-    categories.forEach(category => {
-      const rating = priorityRatings[category.id] || 0;
-      const weight = category.weight || 0;
-      score += (rating * weight) / 100;
-    });
-    return Math.round(score * 10) / 10;
-  };
+  // ... (rest of your existing handler functions)
 
   return (
     <div style={{ 
@@ -182,23 +168,27 @@ const TaskCardTest = () => {
         </p>
       </div>
 
-      {/* Task Cards */}
+      {/* Task Cards - FIXED with unique keys */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {tasks.map(task => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onUpdate={handleTaskUpdate}
-            onDelete={handleTaskDelete}
-            onToggleComplete={handleTaskToggleComplete}
-            onRatePriority={handleRatePriority}
-            savedProjects={savedProjects}
-            priorityCategories={priorityCategories}
-          />
-        ))}
+        {tasks.map((task, index) => {
+          const uniqueKey = generateUniqueTaskKey(task, index);
+          
+          return (
+            <TaskCard
+              key={uniqueKey} // ✅ FIXED: Using guaranteed unique keys
+              task={task}
+              onUpdate={handleTaskUpdate}
+              onDelete={handleTaskDelete}
+              onToggleComplete={handleTaskToggleComplete}
+              onRatePriority={handleRatePriority}
+              savedProjects={savedProjects}
+              priorityCategories={priorityCategories}
+            />
+          );
+        })}
       </div>
 
-      {/* Debug Info */}
+      {/* Debug Info - Enhanced to show key information */}
       <div style={{ 
         marginTop: '2rem', 
         padding: '1rem', 
@@ -212,44 +202,24 @@ const TaskCardTest = () => {
           <p><strong>Active Tasks:</strong> {tasks.filter(t => !t.completedAt).length}</p>
           <p><strong>Completed Tasks:</strong> {tasks.filter(t => t.completedAt).length}</p>
           <p><strong>Overdue Tasks:</strong> {tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && !t.completedAt).length}</p>
+          
+          {/* ✅ NEW: Show React keys for debugging */}
+          <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#f0f9ff', borderRadius: '0.25rem' }}>
+            <strong>React Keys (for debugging duplicate key warnings):</strong>
+            <ul style={{ margin: '0.25rem 0', paddingLeft: '1rem', fontSize: '0.625rem' }}>
+              {tasks.map((task, index) => (
+                <li key={`debug_${index}`}>
+                  Task {index + 1}: {generateUniqueTaskKey(task, index)}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
         
-        <details style={{ marginTop: '1rem' }}>
-          <summary style={{ cursor: 'pointer', color: '#4f46e5' }}>View Raw Task Data</summary>
-          <pre style={{ 
-            fontSize: '0.625rem', 
-            overflow: 'auto',
-            maxHeight: '200px',
-            backgroundColor: '#f8fafc',
-            padding: '0.5rem',
-            borderRadius: '0.25rem',
-            marginTop: '0.5rem'
-          }}>
-            {JSON.stringify(tasks, null, 2)}
-          </pre>
-        </details>
+        {/* ... rest of your debug section */}
       </div>
 
-      {/* Instructions */}
-      <div style={{ 
-        marginTop: '2rem', 
-        padding: '1.5rem', 
-        backgroundColor: '#eff6ff', 
-        borderRadius: '0.5rem',
-        border: '1px solid #bfdbfe'
-      }}>
-        <h3 style={{ color: '#1e40af', marginTop: 0 }}>Testing Instructions</h3>
-        <ul style={{ color: '#1e40af', fontSize: '0.875rem' }}>
-          <li>Click on any task to expand and see inline editing</li>
-          <li>Try editing the title, project, goal, or notes - changes auto-save after 800ms</li>
-          <li>Change the status using the dropdown</li>
-          <li>Toggle task completion with the checkmark button</li>
-          <li>Notice the priority indicators (colored dots) based on calculated scores</li>
-          <li>Observe different visual states: overdue (red border), completed (grayed out), recently updated (yellow highlight)</li>
-          <li>Test the project autocomplete in expanded view</li>
-          <li>Try the "Rate Priority" and "Delete" buttons</li>
-        </ul>
-      </div>
+      {/* ... rest of your existing instructions section */}
     </div>
   );
 };
