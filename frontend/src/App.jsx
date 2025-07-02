@@ -1,4 +1,5 @@
 // Enhanced App.jsx with automatic task priority recalculation when settings change
+// FULLY REWRITTEN WITH PROJECT INTEGRATION
 
 import './styles/globals.css';
 import { ToastProvider } from './hooks/useToast';
@@ -9,6 +10,13 @@ import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
 import SettingsModal from './components/modals/SettingsModal';
 import generateUniqueId from './utils/idGenerator';
+import './App.css';
+
+// NEW: Project-related imports
+import { ProjectProvider } from './context/ProjectContext';
+import { useProjects } from './context/ProjectContext';
+import ProjectTabs from './components/layout/ProjectTabs';
+import ProjectModal from './components/modals/ProjectModal';
 
 // Priority calculation utility function
 const calculateTaskPriorityScore = (task, categories) => {
@@ -40,7 +48,7 @@ const calculateTaskPriorityScore = (task, categories) => {
   return Math.round(score * 10) / 10;
 };
 
-// Enhanced Autosave Indicator Component - FIXED
+// Enhanced Autosave Indicator Component
 const AutosaveIndicator = () => {
   const context = useApp();
   
@@ -123,102 +131,118 @@ const AutosaveIndicator = () => {
   );
 };
 
-// Header Component
+// UPDATED Header Component with Project Integration
 const Header = ({ onCreateTask, onShowFiles, onShowSettings, onForceSave }) => {
-  const headerStyle = {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '12px',
-    padding: '20px',
-    marginBottom: '20px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '15px',
-    color: 'white'
-  };
+    // NEW: Use project context to show current project info
+    const { getCurrentProject, user } = useProjects();
+    const currentProject = getCurrentProject();
 
-  const logoStyle = {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  };
+    const headerStyle = {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        padding: '20px',
+        borderRadius: '15px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+        flexWrap: 'wrap',
+        gap: '15px'
+    };
 
-  const userStatsStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-    flexWrap: 'wrap',
-    background: 'rgba(255, 255, 255, 0.1)',
-    padding: '10px 15px',
-    borderRadius: '20px',
-    backdropFilter: 'blur(10px)'
-  };
+    const logoStyle = {
+        fontSize: '24px',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+    };
 
-  const buttonStyle = {
-    padding: '10px 16px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
-    fontSize: '14px'
-  };
+    const userStatsStyle = {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '15px',
+        fontSize: '14px'
+    };
 
-  const primaryButtonStyle = {
-    ...buttonStyle,
-    background: 'rgba(255, 255, 255, 0.9)',
-    color: '#4f46e5'
-  };
-
-  const secondaryButtonStyle = {
-    ...buttonStyle,
-    background: 'rgba(255, 255, 255, 0.1)',
-    color: 'white',
-    border: '1px solid rgba(255, 255, 255, 0.3)'
-  };
-
-  return (
-    <header style={headerStyle}>
-      <div style={logoStyle}>
-        🎯 Priority Task Manager
-      </div>
-      
-      <div style={userStatsStyle}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.2)',
-          color: 'white',
-          padding: '6px 12px',
-          borderRadius: '15px',
-          fontWeight: 'bold',
-          fontSize: '14px'
-        }}>
-          Multi-Project Mode
-        </div>
-        
-        <AutosaveIndicator />
-      </div>
-      
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button style={primaryButtonStyle} onClick={onCreateTask}>
-          + New Task
-        </button>
-        <button style={secondaryButtonStyle} onClick={onShowFiles}>
-          📁 Files
-        </button>
-        <button style={secondaryButtonStyle} onClick={onShowSettings}>
-          ⚙️ Settings
-        </button>
-        <button style={secondaryButtonStyle} onClick={onForceSave}>
-          💾 Save Now
-        </button>
-      </div>
-    </header>
-  );
+    return (
+        <header style={headerStyle}>
+            <div style={logoStyle}>
+                🎯 Priority Task Manager
+                {/* NEW: Show current project */}
+                {currentProject && (
+                    <span style={{ 
+                        fontSize: '14px', 
+                        background: 'rgba(255,255,255,0.2)', 
+                        padding: '4px 8px', 
+                        borderRadius: '12px',
+                        marginLeft: '10px'
+                    }}>
+                        {currentProject.name}
+                    </span>
+                )}
+            </div>
+            
+            <div style={userStatsStyle}>
+                {/* NEW: Show user level and points from project context */}
+                <div style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    padding: '6px 12px',
+                    borderRadius: '15px',
+                    fontWeight: 'bold'
+                }}>
+                    רמה {user.level} | {user.points} נקודות
+                </div>
+                <AutosaveIndicator />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button 
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                    }}
+                    onClick={onCreateTask}
+                >
+                    + משימה חדשה
+                </button>
+                <button 
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: '#374151',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                    }}
+                    onClick={onShowFiles}
+                >
+                    📁 קבצים
+                </button>
+                <button 
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: '#374151',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                    }}
+                    onClick={onShowSettings}
+                >
+                    ⚙️ הגדרות
+                </button>
+            </div>
+        </header>
+    );
 };
 
 // Search and Filters Component
@@ -567,11 +591,24 @@ const EmptyState = ({ taskCount, onCreateTask, searchQuery, hasFilters }) => {
   );
 };
 
-// Main component that uses the context
-const PriorityTaskManager = () => {
+// NEW: Project-Aware Priority Task Manager Component
+const ProjectAwarePriorityTaskManager = () => {
+  // PROJECT CONTEXT: Get project-specific data
   const { 
-    tasks, 
-    setTasks, 
+    getCurrentProject, 
+    getCurrentTasks,
+    addTask: addProjectTask,
+    updateTask: updateProjectTask,
+    deleteTask: deleteProjectTask,
+    updateUserStats
+  } = useProjects();
+
+  // Get current project data
+  const currentProject = getCurrentProject();
+  const projectTasks = getCurrentTasks();
+
+  // EXISTING CONTEXT: Keep your existing app context
+  const { 
     forceSave,
     priorityCategories,
     setPriorityCategories,
@@ -580,7 +617,7 @@ const PriorityTaskManager = () => {
     importAllData
   } = useApp();
   
-  // UI State
+  // UI STATE: Existing + new project modal state
   const [toast, setToast] = useState({ show: false, message: '' });
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -589,42 +626,39 @@ const PriorityTaskManager = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   
+  // NEW: Project modal state
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  
   const showToast = (message) => {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   };
 
-  // 🔧 ENHANCED: Recalculate all task priority scores when categories change
+  // UPDATED: Recalculate priorities for current project
   const recalculateAllTaskPriorities = (newCategories) => {
-    console.log('🔄 Recalculating all task priorities with new categories');
+    console.log('🔄 Recalculating task priorities for current project');
     
-    setTasks(prevTasks => {
-      const updatedTasks = prevTasks.map(task => {
-        // Only recalculate if task has priority ratings
-        if (task.priorityRatings && Object.keys(task.priorityRatings).length > 0) {
-          const newScore = calculateTaskPriorityScore(task, newCategories);
-          console.log(`📊 Task "${task.title}": ${task.priorityScore || 0} → ${newScore}`);
-          
-          return {
-            ...task,
-            priorityScore: newScore,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return task;
-      });
-      
-      console.log('✅ Priority recalculation complete');
-      return updatedTasks;
+    projectTasks.forEach(task => {
+      if (task.priorityRatings && Object.keys(task.priorityRatings).length > 0) {
+        const newScore = calculateTaskPriorityScore(task, newCategories);
+        console.log(`📊 Task "${task.title}": ${task.priorityScore || 0} → ${newScore}`);
+        
+        updateProjectTask(task.id, {
+          priorityScore: newScore,
+          updatedAt: new Date().toISOString()
+        });
+      }
     });
+    
+    console.log('✅ Priority recalculation complete');
   };
 
-  // Calculate task statistics
+  // UPDATED: Calculate stats from project tasks
   const getTaskStats = () => {
-    const total = tasks.length;
-    const completed = tasks.filter(task => task.status === 'הושלם').length;
+    const total = projectTasks.length;
+    const completed = projectTasks.filter(task => task.status === 'הושלם').length;
     const active = total - completed;
-    const overdue = tasks.filter(task => 
+    const overdue = projectTasks.filter(task => 
       task.dueDate && 
       task.status !== 'הושלם' && 
       new Date(task.dueDate) < new Date()
@@ -632,9 +666,9 @@ const PriorityTaskManager = () => {
     return { total, completed, active, overdue };
   };
 
-  // Filter tasks based on search and status
+  // UPDATED: Filter project tasks
   const getFilteredTasks = () => {
-    let filtered = [...tasks];
+    let filtered = [...projectTasks];
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -660,7 +694,7 @@ const PriorityTaskManager = () => {
     return filtered;
   };
 
-  // Task handlers
+  // TASK HANDLERS: Updated to use project context
   const handleCreateTask = () => {
     console.log('handleCreateTask called');
     setEditingTask(null);
@@ -674,7 +708,7 @@ const PriorityTaskManager = () => {
 
   const handleDeleteTask = (taskId) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
-      setTasks(prev => prev.filter(t => t.id !== taskId));
+      deleteProjectTask(taskId);
       showToast('Task deleted successfully');
     }
   };
@@ -687,26 +721,14 @@ const PriorityTaskManager = () => {
         ...taskData,
         dueDate: taskData.dueDate || null,
         priorityRatings: taskData.priorityRatings || {},
-        priorityScore: calculateTaskPriorityScore(taskData, priorityCategories)
+        priorityScore: calculateTaskPriorityScore(taskData, currentProject?.priorityCategories || priorityCategories)
       };
       
       if (editingTask) {
-        const updatedTask = {
-          ...processedData,
-          id: editingTask.id,
-          updatedAt: new Date().toISOString()
-        };
-        setTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t));
+        updateProjectTask(editingTask.id, processedData);
         showToast(`Task "${taskData.title}" updated successfully!`);
       } else {
-        const newTask = {
-          ...processedData,
-          id: generateUniqueId(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        console.log('Creating new task:', newTask);
-        setTasks(prev => [...prev, newTask]);
+        addProjectTask(processedData);
         showToast(`Task "${taskData.title}" created successfully!`);
       }
       setShowTaskForm(false);
@@ -718,34 +740,49 @@ const PriorityTaskManager = () => {
   };
 
   const handleCompleteTask = (taskId) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
+    
     const wasCompleted = task.status === 'הושלם';
-    const updatedTask = {
-      ...task,
+    const updatedFields = {
       status: wasCompleted ? 'בעבודה' : 'הושלם',
       completedAt: wasCompleted ? null : new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-    if (!wasCompleted) {
-      showToast(`Task completed!`);
+    
+    updateProjectTask(taskId, updatedFields);
+    
+    // Award points for completion
+    if (!wasCompleted && task.priorityScore) {
+      const points = Math.round(task.priorityScore * 10);
+      updateUserStats({ points: points });
+      showToast(`Task completed! +${points} points`);
     } else {
-      showToast('Task marked as incomplete');
+      showToast(wasCompleted ? 'Task marked as incomplete' : 'Task completed!');
     }
   };
 
-  // 🔧 ENHANCED: Settings handlers with priority recalculation
+  // PROJECT HANDLERS: New project-specific handlers
+  const handleNewProject = () => {
+    setShowProjectModal(true);
+  };
+
+  const handleCloseProjectModal = () => {
+    setShowProjectModal(false);
+  };
+
+  // SETTINGS HANDLERS: Updated for project-aware categories
   const handleUpdateCategories = (newCategories) => {
     console.log('🔧 handleUpdateCategories called with:', newCategories);
     
-    // Update categories first
-    setPriorityCategories(newCategories);
-    
-    // Then recalculate all task priorities
-    recalculateAllTaskPriorities(newCategories);
-    
-    showToast('Priority categories updated and task scores recalculated!');
+    // Update current project's categories
+    if (currentProject) {
+      // Update the project's categories through project context
+      // This will be handled by the project context when we implement updateProject
+      setPriorityCategories(newCategories);
+      recalculateAllTaskPriorities(newCategories);
+      showToast('Priority categories updated and task scores recalculated!');
+    }
   };
 
   const handleExportData = () => {
@@ -777,10 +814,13 @@ const PriorityTaskManager = () => {
 
   const handleResetData = () => {
     console.log('🔧 handleResetData called');
-    setTasks([]);
-    setSearchQuery('');
-    setStatusFilter('all');
-    showToast('All data has been reset!');
+    if (currentProject && window.confirm(`Reset all tasks in project "${currentProject.name}"?`)) {
+      // Reset current project tasks
+      currentProject.tasks = [];
+      setSearchQuery('');
+      setStatusFilter('all');
+      showToast('Project data has been reset!');
+    }
   };
 
   const handleClearFilters = () => {
@@ -806,6 +846,12 @@ const PriorityTaskManager = () => {
         }}
       />
 
+      {/* NEW: Project Tabs */}
+      <ProjectTabs 
+        onNewProject={handleNewProject}
+        onManageCategories={() => setShowSettings(true)}
+      />
+
       <SearchAndFilters
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -818,7 +864,7 @@ const PriorityTaskManager = () => {
       <main className="main-content">
         {filteredTasks.length === 0 ? (
           <EmptyState 
-            taskCount={tasks.length} 
+            taskCount={projectTasks.length} 
             onCreateTask={handleCreateTask}
             searchQuery={searchQuery}
             hasFilters={hasFilters}
@@ -831,15 +877,14 @@ const PriorityTaskManager = () => {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)' 
           }}>
             <h3 style={{ marginBottom: '15px', color: '#1f2937' }}>
-              📋 {hasFilters ? 'Filtered Tasks' : 'Your Tasks'} ({filteredTasks.length})
-              {hasFilters && <span style={{ fontSize: '14px', color: '#6b7280' }}> of {tasks.length} total</span>}
+              📋 {hasFilters ? 'Filtered Tasks' : `${currentProject?.name || 'Tasks'}`} ({filteredTasks.length})
+              {hasFilters && <span style={{ fontSize: '14px', color: '#6b7280' }}> of {projectTasks.length} total</span>}
             </h3>
             {filteredTasks.map(task => (
               <EnhancedTaskCard
                 key={task.id}
                 task={task}
                 onEdit={handleEditTask}
-                onComplete={handleCompleteTask}
                 onDelete={handleDeleteTask}
               />
             ))}
@@ -847,7 +892,7 @@ const PriorityTaskManager = () => {
         )}
       </main>
 
-      {/* Modals */}
+      {/* EXISTING MODALS: All your existing modals */}
       {showTaskForm && (
         <TaskForm
           isOpen={showTaskForm}
@@ -856,7 +901,7 @@ const PriorityTaskManager = () => {
           onCancel={() => setShowTaskForm(false)}
           onClose={() => setShowTaskForm(false)}
           savedProjects={savedProjects}
-          priorityCategories={priorityCategories}
+          priorityCategories={currentProject?.priorityCategories || priorityCategories}
         />
       )}
 
@@ -864,6 +909,7 @@ const PriorityTaskManager = () => {
         <FileManager
           isOpen={showFileManager}
           onClose={() => setShowFileManager(false)}
+          currentProject={currentProject}
         />
       )}
 
@@ -871,7 +917,7 @@ const PriorityTaskManager = () => {
         <SettingsModal
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
-          priorityCategories={priorityCategories}
+          priorityCategories={currentProject?.priorityCategories || priorityCategories}
           onUpdateCategories={handleUpdateCategories}
           onExportData={handleExportData}
           onImportData={handleImportData}
@@ -880,7 +926,13 @@ const PriorityTaskManager = () => {
         />
       )}
 
-      {/* Toast Notification */}
+      {/* NEW: Project Modal */}
+      <ProjectModal 
+        isOpen={showProjectModal}
+        onClose={handleCloseProjectModal}
+      />
+
+      {/* EXISTING: Toast Notification */}
       {toast.show && (
         <div style={{
           position: 'fixed',
@@ -900,13 +952,15 @@ const PriorityTaskManager = () => {
   );
 };
 
-// Main App with providers
+// UPDATED: Main App with Project Provider
 function App() {
   return (
     <ToastProvider>
       <AppProvider>
-        <PriorityTaskManager />
-        <ToastContainer />
+        <ProjectProvider>
+          <ProjectAwarePriorityTaskManager />
+          <ToastContainer />
+        </ProjectProvider>
       </AppProvider>
     </ToastProvider>
   );

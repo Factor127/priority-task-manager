@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useProjects } from '../../context/ProjectContext'; // NEW: Import project context
 
 const FileManager = ({ isOpen, onClose }) => {
   const { 
@@ -7,17 +8,33 @@ const FileManager = ({ isOpen, onClose }) => {
     priorityCategories, 
     exportAllData, 
     importAllData,
+    setTasks,
+    savedProjects,
+    setSavedProjects
+  } = useApp();
+  
+  // NEW: Project context integration
+  const {
     projects,
     currentProjectId,
-    setTasks,
-    savedProjects,        // ✅ ADD THIS
-    setSavedProjects      // ✅ ADD THIS
-  } = useApp();
+    getCurrentProject,
+    setCurrentProject,
+    addTask: addProjectTask,
+    getProjectsSortedByPriority
+  } = useProjects();
   
   const [importType, setImportType] = useState('json');
   const [exportType, setExportType] = useState('csv');
   const [filterStatus, setFilterStatus] = useState('all');
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  // NEW: Import flow states
+  const [importStep, setImportStep] = useState('select'); // 'select', 'project-choice', 'importing', 'success'
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(currentProjectId);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importResult, setImportResult] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Duplicate handling state
   const [duplicateDialog, setDuplicateDialog] = useState({
@@ -26,6 +43,18 @@ const FileManager = ({ isOpen, onClose }) => {
     newTasks: [],
     onResolve: null
   });
+
+  // Reset import state when modal opens/closes
+  React.useEffect(() => {
+    if (isOpen) {
+      setImportStep('select');
+      setSelectedFile(null);
+      setSelectedProjectId(currentProjectId);
+      setImportPreview(null);
+      setImportResult(null);
+      setIsProcessing(false);
+    }
+  }, [isOpen, currentProjectId]);
 
   const showToast = (message, type = 'success') => {
     console.log(`🔔 Toast: ${message} (${type})`);
@@ -82,7 +111,7 @@ const FileManager = ({ isOpen, onClose }) => {
     return rows;
   };
 
-  // Convert CSV task with exact column mapping
+  // Convert CSV task with project-specific categories
   const convertCSVTask = (csvTask, categories) => {
     console.log('🔄 Converting CSV task:', csvTask.title);
     
@@ -119,7 +148,7 @@ const FileManager = ({ isOpen, onClose }) => {
     const isRepeating = csvTask.isRepeating === 'true' || csvTask.isRepeating === true;
 
     const convertedTask = {
-      id: csvTask.id || Date.now() + Math.random(),
+      id: csvTask.id || generateUniqueId(),
       title: csvTask.title || 'Imported Task',
       project: csvTask.project || '',
       goal: csvTask.goal || '',
@@ -140,11 +169,222 @@ const FileManager = ({ isOpen, onClose }) => {
     return convertedTask;
   };
 
+  // NEW: Analyze import data to show preview
+  const analyzeImportData = (data) => {
+    let taskCount = 0;
+    let projectCount = 0;
+    let dataType = 'unknown';
+
+    if (data.projects) {
+      // New project-based format
+      dataType = 'project-based';
+      projectCount = Object.keys(data.projects).length;
+      taskCount = Object.values(data.projects).reduce((total, project) => {
+        return total + (project.tasks ? project.tasks.length : 0);
+      }, 0);
+    } else if (data.tasks || Array.isArray(data)) {
+      // Legacy task list format
+      dataType = 'task-list';
+      const tasks = data.tasks || data;
+      taskCount = Array.isArray(tasks) ? tasks.length : 0;
+    } else if (data.project && data.project.tasks) {
+      // Single project export
+      dataType = 'single-project';
+      taskCount = data.project.tasks.length;
+      projectCount = 1;
+    }
+
+    return {
+      dataType,
+      taskCount,
+      projectCount,
+      hasCategories: !!(data.priorityCategories || data.categories),
+      hasUserData: !!(data.user),
+      fileName: selectedFile?.name || 'Unknown',
+      fileSize: selectedFile ? (selectedFile.size / 1024).toFixed(1) + ' KB' : 'Unknown'
+    };
+  };
+
+  // NEW: Handle file selection with preview
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (importType === 'json' && (file.type !== 'application/json' && !file.name.endsWith('.json'))) {
+      showToast('Please select a JSON file', 'error');
+      return;
+    }
+
+    if (importType === 'csv' && !file.name.endsWith('.csv')) {
+      showToast('Please select a CSV file', 'error');
+      return;
+    }
+
+    setSelectedFile(file);
+    setIsProcessing(true);
+
+    // Read and preview file content
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        let data;
+        
+        if (importType === 'json') {
+          data = JSON.parse(e.target.result);
+        } else if (importType === 'csv') {
+          const csvTasks = parseCSV(e.target.result);
+          data = { tasks: csvTasks };
+        }
+        
+        // Analyze the import data structure
+        const preview = analyzeImportData(data);
+        setImportPreview({ ...preview, rawData: data });
+        setImportStep('project-choice');
+        setIsProcessing(false);
+      } catch (error) {
+        console.error('File parsing error:', error);
+        showToast(`Invalid ${importType.toUpperCase()} file. Please check the file format.`, 'error');
+        setSelectedFile(null);
+        setIsProcessing(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // NEW: Execute import to selected project
+  const handleImportToProject = async () => {
+    if (!selectedFile || !selectedProjectId || !importPreview) return;
+
+    setIsProcessing(true);
+    setImportStep('importing');
+
+    try {
+      const targetProject = projects[selectedProjectId];
+      if (!targetProject) {
+        throw new Error('Target project not found');
+      }
+
+      const { rawData } = importPreview;
+      let tasksToImport = [];
+
+      // Extract tasks based on data format
+      if (rawData.projects) {
+        // Import from project-based export - combine all tasks
+        Object.values(rawData.projects).forEach(project => {
+          if (project.tasks && project.tasks.length > 0) {
+            tasksToImport.push(...project.tasks);
+          }
+        });
+      } else if (rawData.tasks || Array.isArray(rawData)) {
+        // Import from legacy task list or direct array
+        tasksToImport = rawData.tasks || rawData;
+      } else if (rawData.project && rawData.project.tasks) {
+        // Import from single project export
+        tasksToImport = rawData.project.tasks;
+      }
+
+      // Convert CSV tasks if needed
+      if (importType === 'csv') {
+        tasksToImport = tasksToImport.map(csvTask => 
+          convertCSVTask(csvTask, targetProject.priorityCategories)
+        );
+      }
+
+      console.log(`📥 Processing ${tasksToImport.length} tasks for import to project: ${targetProject.name}`);
+
+      // Process tasks with duplicate detection
+      await importTasksToProject(tasksToImport, selectedProjectId);
+
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportResult({
+        success: false,
+        error: error.message
+      });
+      setImportStep('success');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // NEW: Import tasks to specific project with duplicate detection
+  const importTasksToProject = async (tasksToImport, projectId) => {
+    const targetProject = projects[projectId];
+    const existingProjectTasks = targetProject.tasks || [];
+    
+    // Check for duplicates within the project
+    const { duplicates, uniqueTasks } = findDuplicates(tasksToImport, existingProjectTasks);
+    
+    if (duplicates.length > 0) {
+      console.log('⚠️ Found', duplicates.length, 'duplicate tasks in project');
+      
+      // Show duplicate dialog for project-specific duplicates
+      setDuplicateDialog({
+        show: true,
+        duplicates,
+        newTasks: uniqueTasks,
+        targetProjectId: projectId,
+        onResolve: async (duplicateResolution) => {
+          // Combine unique tasks with resolved duplicates
+          const allTasksToAdd = [...uniqueTasks, ...duplicateResolution];
+          await addTasksToProject(allTasksToAdd, projectId);
+        }
+      });
+      
+      return;
+    }
+    
+    // No duplicates - proceed with direct import
+    await addTasksToProject(uniqueTasks, projectId);
+  };
+
+  // NEW: Add tasks to project using project context
+  const addTasksToProject = async (tasksToAdd, projectId) => {
+    let importedCount = 0;
+    let skippedCount = 0;
+    
+    for (const taskData of tasksToAdd) {
+      try {
+        // Generate new ID to avoid conflicts and ensure uniqueness
+        const newTask = {
+          ...taskData,
+          id: generateUniqueId(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          completedAt: null // Clear completion status for imports
+        };
+
+        // Use project context to add task
+        await addProjectTask(newTask);
+        importedCount++;
+      } catch (error) {
+        console.warn('Failed to import task:', taskData.title, error);
+        skippedCount++;
+      }
+    }
+
+    // Update saved projects list
+    const newProjects = tasksToAdd
+      .map(task => task.project)
+      .filter(project => project && !savedProjects.includes(project));
+    
+    if (newProjects.length > 0) {
+      setSavedProjects(prev => [...prev, ...newProjects]);
+    }
+
+    setImportResult({
+      success: true,
+      taskCount: importedCount,
+      skippedCount,
+      projectName: projects[projectId]?.name || 'Unknown Project'
+    });
+    setImportStep('success');
+  };
+
   // ENHANCED DUPLICATE DETECTION: Check for duplicates by title AND ID
   const findDuplicates = (newTasks, existingTasks) => {
     console.log('🔍 Checking for duplicates by title and ID...');
     
-    // Create maps for both title and ID comparison
     const existingTitles = new Map();
     const existingIds = new Set();
     
@@ -182,21 +422,16 @@ const FileManager = ({ isOpen, onClose }) => {
       }
     });
 
-    console.log('🔍 Enhanced duplicate check results:', {
+    console.log('🔍 Duplicate check results:', {
       total: newTasks.length,
       duplicates: duplicates.length,
-      unique: uniqueTasks.length,
-      duplicateBreakdown: {
-        titleOnly: duplicates.filter(d => d.duplicateType === 'title').length,
-        idOnly: duplicates.filter(d => d.duplicateType === 'id').length,
-        both: duplicates.filter(d => d.duplicateType === 'both').length
-      }
+      unique: uniqueTasks.length
     });
 
     return { duplicates, uniqueTasks };
   };
 
-  // DUPLICATE RESOLUTION: Handle user's choice for duplicates with unique ID generation
+  // DUPLICATE RESOLUTION: Handle user's choice for duplicates
   const handleDuplicateResolution = (action) => {
     const { duplicates, onResolve } = duplicateDialog;
     
@@ -205,40 +440,21 @@ const FileManager = ({ isOpen, onClose }) => {
     let tasksToAdd = [];
     
     if (action === 'skip') {
-      // Skip all duplicates - add nothing from duplicates
-      console.log('⏭️ Skipping all duplicate tasks');
       tasksToAdd = [];
     } else if (action === 'duplicate') {
-      // Add all duplicates with guaranteed unique IDs
-      console.log('📋 Adding all duplicate tasks with new unique IDs');
       tasksToAdd = duplicates.map(dup => ({
         ...dup.newTask,
-        id: Date.now() + Math.random() + Math.random(), // Extra randomness for uniqueness
-        title: `${dup.newTask.title} (Import ${new Date().toLocaleDateString()})`, // Add suffix to distinguish
+        id: generateUniqueId(),
+        title: `${dup.newTask.title} (Import ${new Date().toLocaleDateString()})`,
         updatedAt: new Date().toISOString()
       }));
     } else if (action === 'replace') {
-      // Replace existing tasks with new data, but ensure unique IDs
-      console.log('🔄 Replacing existing tasks with imported data');
-      tasksToAdd = duplicates.map(dup => {
-        // If it's an ID duplicate, generate a new unique ID
-        const useExistingId = dup.duplicateType === 'title' && dup.duplicateType !== 'id';
-        return {
-          ...dup.newTask,
-          id: useExistingId ? dup.existingTask.id : Date.now() + Math.random() + Math.random(),
-          createdAt: useExistingId ? dup.existingTask.createdAt : dup.newTask.createdAt,
-          updatedAt: new Date().toISOString()
-        };
-      });
+      tasksToAdd = duplicates.map(dup => ({
+        ...dup.newTask,
+        id: generateUniqueId(), // Always generate new ID for safety
+        updatedAt: new Date().toISOString()
+      }));
     }
-
-    console.log('📊 Duplicate resolution result:', {
-      action,
-      tasksToAdd: tasksToAdd.length,
-      allUniqueIds: tasksToAdd.every((task, index, arr) => 
-        arr.findIndex(t => t.id === task.id) === index
-      )
-    });
 
     // Close dialog and process
     setDuplicateDialog({ show: false, duplicates: [], newTasks: [], onResolve: null });
@@ -249,247 +465,82 @@ const FileManager = ({ isOpen, onClose }) => {
     }
   };
 
-  // MAIN IMPORT FUNCTION with duplicate detection
-  const performImport = (tasksToImport) => {
-  console.log('🔧 Performing import with', tasksToImport.length, 'tasks');
-  
-  const existingTasks = tasks || [];
-  
-  // Check for duplicates by title
-  const { duplicates, uniqueTasks } = findDuplicates(tasksToImport, existingTasks);
-  
-  if (duplicates.length > 0) {
-    console.log('⚠️ Found', duplicates.length, 'duplicate tasks');
-    
-    // Show duplicate dialog
-    setDuplicateDialog({
-      show: true,
-      duplicates,
-      newTasks: uniqueTasks,
-      onResolve: (duplicateResolution) => {
-        // Combine unique tasks with resolved duplicates
-        const allTasksToAdd = [...uniqueTasks, ...duplicateResolution];
-        
-        if (allTasksToAdd.length > 0) {
-          // Use setTasks instead of setProjects
-          setTasks(prev => [...prev, ...allTasksToAdd]);
-          showToast(`Successfully imported ${allTasksToAdd.length} tasks!`);
-        } else {
-          showToast('No new tasks imported (all were skipped duplicates)', 'info');
-        }
-      }
-    });
-    
-    return;
-  }
-  
-  // No duplicates - proceed with direct import
-  if (uniqueTasks.length > 0) {
-    setTasks(prev => [...prev, ...uniqueTasks]);
-    showToast(`Successfully imported ${uniqueTasks.length} new tasks!`);
-  } else {
-    showToast('No tasks to import', 'info');
-  }
-};
-
-  // MAIN IMPORT HANDLER
-  // Updated import logic for FileManager.jsx
-
-const handleTaskImport = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    console.log('🚀 Starting import with duplicate detection:', {
-        fileName: file.name,
-        fileType: file.type,
-        importType,
-        currentProjectId: 'default',
-        currentTaskCount: tasks.length
-    });
-
-    showToast('Starting import...', 'info');
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            let importedTasks = [];
-            
-            console.log('📄 Processing JSON file...');
-            
-            if (importType === 'json') {
-                const data = JSON.parse(e.target.result);
-                console.log('✅ JSON is direct array format');
-                importedTasks = Array.isArray(data) ? data : (data.tasks || []);
-            } else if (importType === 'csv') {
-                const csvTasks = parseCSV(e.target.result);
-                importedTasks = csvTasks.map(csvTask => convertCSVTask(csvTask, priorityCategories));
-            }
-            
-            if (importedTasks.length > 0) {
-                console.log(`📥 Processing ${importedTasks.length} tasks for import...`);
-                performImportWithDuplicateDetection(importedTasks);
-            } else {
-                showToast('No valid tasks found in the file.', 'error');
-            }
-        } catch (error) {
-            console.error('Import error:', error);
-            showToast(`Error importing file: ${error.message}`, 'error');
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-};
-
-const performImportWithDuplicateDetection = (importedTasks) => {
-    console.log('🔧 Performing import with', importedTasks.length, 'tasks');
-    
-    // Enhanced duplicate detection
-    const duplicateResults = checkForDuplicatesEnhanced(importedTasks, tasks);
-    console.log('🔍 Enhanced duplicate check results:', duplicateResults);
-    
-    if (duplicateResults.duplicates > 0) {
-        console.log('⚠️ Found', duplicateResults.duplicates, 'duplicate tasks');
-        
-        // For this fix, we'll use 'replace' action to resolve duplicates
-        const resolution = resolveDuplicates(duplicateResults, 'replace');
-        console.log('📊 Duplicate resolution result:', resolution);
-        
-        if (resolution.action === 'replace') {
-            // CRITICAL FIX: Ensure all tasks have unique IDs and React keys
-            const tasksToAdd = resolution.tasksToAdd.map((task, index) => {
-                const uniqueId = generateUniqueId(); // Generate truly unique ID
-                return {
-                    ...task,
-                    id: uniqueId,
-                    reactKey: `${uniqueId}_${Date.now()}_${index}`, // Ensure unique React key
-                    createdAt: task.createdAt || new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
-            });
-            
-            // Remove existing duplicates first, then add new ones
-            const existingTaskIds = resolution.existingTaskIds || [];
-            const filteredExistingTasks = tasks.filter(task => !existingTaskIds.includes(task.id));
-            
-            // Set the new task list with guaranteed unique keys
-            setTasks([...filteredExistingTasks, ...tasksToAdd]);
-            
-            // Add new projects
-            const newProjects = tasksToAdd
-                .map(task => task.project)
-                .filter(project => project && !savedProjects.includes(project));
-            
-            if (newProjects.length > 0) {
-                setSavedProjects(prev => [...prev, ...newProjects]);
-            }
-            
-            showToast(`Successfully imported ${importedTasks.length} tasks!`, 'success');
-        }
-    } else {
-        // No duplicates - add all tasks with unique IDs
-        const tasksWithUniqueIds = importedTasks.map((task, index) => {
-            const uniqueId = generateUniqueId();
-            return {
-                ...task,
-                id: uniqueId,
-                reactKey: `${uniqueId}_${Date.now()}_${index}`, // Unique React key
-                createdAt: task.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-        });
-        
-        setTasks(prev => [...prev, ...tasksWithUniqueIds]);
-        
-        // Add new projects
-        const newProjects = tasksWithUniqueIds
-            .map(task => task.project)
-            .filter(project => project && !savedProjects.includes(project));
-        
-        if (newProjects.length > 0) {
-            setSavedProjects(prev => [...prev, ...newProjects]);
-        }
-        
-        showToast(`Successfully imported ${tasksWithUniqueIds.length} tasks!`, 'success');
-    }
-};
-
-// Helper function to generate truly unique IDs
-const generateUniqueId = () => {
+  // Helper function to generate truly unique IDs
+  const generateUniqueId = () => {
     return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 9)}`;
-};
+  };
 
-// Enhanced duplicate checking function
-const checkForDuplicatesEnhanced = (importedTasks, existingTasks) => {
-    console.log('🔍 Checking for duplicates by title and ID...');
-    
-    const duplicates = [];
-    const unique = [];
-    const duplicateBreakdown = {
-        byTitle: 0,
-        byId: 0,
-        byBoth: 0
-    };
-    
-    importedTasks.forEach(importedTask => {
-        const duplicateByTitle = existingTasks.find(existing => 
-            existing.title && importedTask.title && 
-            existing.title.trim().toLowerCase() === importedTask.title.trim().toLowerCase()
-        );
-        
-        const duplicateById = existingTasks.find(existing => 
-            existing.id && importedTask.id && existing.id === importedTask.id
-        );
-        
-        if (duplicateByTitle || duplicateById) {
-            duplicates.push({
-                imported: importedTask,
-                existing: duplicateByTitle || duplicateById,
-                matchType: duplicateByTitle && duplicateById ? 'both' : 
-                          (duplicateByTitle ? 'title' : 'id')
-            });
-            
-            if (duplicateByTitle && duplicateById) duplicateBreakdown.byBoth++;
-            else if (duplicateByTitle) duplicateBreakdown.byTitle++;
-            else duplicateBreakdown.byId++;
-        } else {
-            unique.push(importedTask);
-        }
-    });
-    
-    return {
-        total: importedTasks.length,
-        duplicates: duplicates.length,
-        unique: unique.length,
-        duplicateBreakdown,
-        duplicateList: duplicates,
-        uniqueList: unique
-    };
-};
+  // Reset import process
+  const resetImport = () => {
+    setImportStep('select');
+    setSelectedFile(null);
+    setImportPreview(null);
+    setImportResult(null);
+    setIsProcessing(false);
+    // Reset file input
+    const fileInput = document.getElementById('import-file');
+    if (fileInput) fileInput.value = '';
+  };
 
-// Resolve duplicates function
-const resolveDuplicates = (duplicateResults, action) => {
-    console.log('🔧 Resolving duplicates with action:', action);
-    
-    if (action === 'replace') {
-        console.log('🔄 Replacing existing tasks with imported data');
-        
-        const existingTaskIds = duplicateResults.duplicateList.map(dup => dup.existing.id);
-        const tasksToAdd = duplicateResults.duplicateList.map(dup => dup.imported)
-            .concat(duplicateResults.uniqueList);
-        
-        return {
-            action: 'replace',
-            tasksToAdd,
-            existingTaskIds,
-            allUniqueIds: true
-        };
+  // EXISTING EXPORT FUNCTIONS (Enhanced with project support)
+
+  // NEW: Export current project only
+  const handleExportCurrentProject = () => {
+    try {
+      const currentProject = getCurrentProject();
+      if (!currentProject) {
+        showToast('No current project selected', 'error');
+        return;
+      }
+
+      const exportData = {
+        project: currentProject,
+        exportDate: new Date().toISOString(),
+        exportType: 'single-project',
+        version: '2.0'
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentProject.name.replace(/[^a-z0-9]/gi, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      showToast(`Project "${currentProject.name}" exported successfully!`);
+    } catch (error) {
+      console.error('Export error:', error);
+      showToast('Export failed: ' + error.message, 'error');
     }
-    
-    // Add other resolution strategies here if needed
-    return { action, tasksToAdd: [], existingTaskIds: [] };
-};
+  };
 
-  // Generate CSV for export
+  // NEW: Export all projects
+  const handleExportAllProjects = () => {
+    try {
+      const exportData = {
+        projects,
+        exportDate: new Date().toISOString(),
+        exportType: 'all-projects',
+        version: '2.0'
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `priority-tasks-all-projects-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      showToast('All projects exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      showToast('Export failed: ' + error.message, 'error');
+    }
+  };
+
+  // Generate CSV for export (updated for current project)
   const generateTasksCSV = (tasks, categories) => {
     const headers = [
       'title', 'project', 'goal', 'update', 'type', 'status', 'dueDate', 'link',
@@ -527,11 +578,18 @@ const resolveDuplicates = (duplicateResults, action) => {
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
 
-  // Export handler
+  // Export handler (updated for current project)
   const handleTaskExport = () => {
     console.log('📤 Starting export...');
     
-    const filteredTasks = tasks.filter(task => {
+    const currentProject = getCurrentProject();
+    if (!currentProject) {
+      showToast('No current project selected', 'error');
+      return;
+    }
+
+    const projectTasks = currentProject.tasks || [];
+    const filteredTasks = projectTasks.filter(task => {
       if (filterStatus === 'all') return true;
       if (filterStatus === 'active') return task.status !== 'הושלם';
       if (filterStatus === 'completed') return task.status === 'הושלם';
@@ -546,12 +604,12 @@ const resolveDuplicates = (duplicateResults, action) => {
     let content, filename, mimeType;
     
     if (exportType === 'csv') {
-      content = generateTasksCSV(filteredTasks, priorityCategories);
-      filename = `tasks-${filterStatus}-${new Date().toISOString().split('T')[0]}.csv`;
+      content = generateTasksCSV(filteredTasks, currentProject.priorityCategories);
+      filename = `${currentProject.name}-tasks-${filterStatus}-${new Date().toISOString().split('T')[0]}.csv`;
       mimeType = 'text/csv';
     } else {
       content = JSON.stringify(filteredTasks, null, 2);
-      filename = `tasks-${filterStatus}-${new Date().toISOString().split('T')[0]}.json`;
+      filename = `${currentProject.name}-tasks-${filterStatus}-${new Date().toISOString().split('T')[0]}.json`;
       mimeType = 'application/json';
     }
 
@@ -563,15 +621,18 @@ const resolveDuplicates = (duplicateResults, action) => {
     a.click();
     URL.revokeObjectURL(url);
     
-    showToast(`Exported ${filteredTasks.length} tasks successfully!`);
+    showToast(`Exported ${filteredTasks.length} tasks from ${currentProject.name}!`);
   };
 
-  // Template download
+  // Template download (updated for current project categories)
   const downloadTemplate = () => {
+    const currentProject = getCurrentProject();
+    const categories = currentProject?.priorityCategories || priorityCategories;
+    
     const templateHeaders = [
       'title', 'project', 'goal', 'update', 'type', 'status', 'dueDate', 'link',
       'isRepeating', 'repeatInterval',
-      'Income/Revenue', 'Home Management', '5-Year Plan', 'Social', 'Relationship', 'Personal', 'Children',
+      ...categories.map(cat => cat.english),
       'createdAt', 'updatedAt', 'completedAt'
     ];
     
@@ -579,7 +640,7 @@ const resolveDuplicates = (duplicateResults, action) => {
       'Sample Task', 'Sample Project', 'Sample Goal', 'Sample Update',
       'מנהלה', 'לא התחיל', '2025-12-31', 'https://example.com',
       'false', 'monthly',
-      '3', '4', '2', '3', '2', '4', '5',
+      ...categories.map(() => '3'),
       new Date().toISOString(), new Date().toISOString(), ''
     ];
     
@@ -592,14 +653,14 @@ const resolveDuplicates = (duplicateResults, action) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'task-import-template.csv';
+    a.download = `task-import-template-${currentProject?.name || 'default'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     
-    showToast('Template downloaded - matches your CSV format!');
+    showToast(`Template downloaded for ${currentProject?.name || 'current project'}!`);
   };
 
-  // Complete backup handlers
+  // Complete backup handlers (keep existing)
   const handleCompleteBackup = () => {
     try {
       const message = exportAllData();
@@ -664,7 +725,7 @@ const resolveDuplicates = (duplicateResults, action) => {
           borderBottom: '1px solid #e5e7eb'
         }}>
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', margin: 0 }}>
-            📁 File Manager - With Duplicate Detection
+            📁 File Manager - Project-Based Import
           </h2>
           <button style={{
             background: 'none',
@@ -677,7 +738,7 @@ const resolveDuplicates = (duplicateResults, action) => {
           </button>
         </div>
 
-        {/* Debug Info */}
+        {/* Current Project Info */}
         <div style={{
           background: '#f0f9ff',
           border: '1px solid #0ea5e9',
@@ -686,12 +747,12 @@ const resolveDuplicates = (duplicateResults, action) => {
           marginBottom: '20px',
           fontSize: '14px'
         }}>
-          <strong>🔧 Enhanced Import:</strong> Project: {currentProjectId} | 
-          Tasks: {tasks.length} | 
-          Duplicate Detection: ✅ Active |
-Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </div>
+          <strong>🎯 Current Project:</strong> {getCurrentProject()?.name || 'None'} | 
+          Tasks: {getCurrentProject()?.tasks?.length || 0} | 
+          Total Projects: {Object.keys(projects).length}
+        </div>
 
-        {/* Task Import Section */}
+        {/* NEW: Enhanced Task Import Section with Project Selection */}
         <div style={{
           border: '2px solid #10b981',
           borderRadius: '8px',
@@ -699,82 +760,275 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
           background: '#f0fdf4',
           marginBottom: '20px'
         }}>
-          <h3 style={{ margin: '0 0 16px 0', color: '#374151' }}>📥 Import Tasks - With Duplicate Detection</h3>
+          <h3 style={{ margin: '0 0 16px 0', color: '#374151' }}>📥 Import Tasks to Project</h3>
           
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px' }}>
-              Import Format:
-            </label>
-            <select
-              value={importType}
-              onChange={(e) => setImportType(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                width: '100%',
-                marginBottom: '12px'
-              }}
-            >
-              <option value="json">JSON (Your tasks-all file)</option>
-              <option value="csv">CSV (Your CSV export)</option>
-            </select>
-            
-            <label style={{
-              display: 'block',
-              padding: '12px 16px',
-              background: '#10b981',
-              color: 'white',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              textAlign: 'center',
-              marginBottom: '12px'
-            }}>
-              📤 Choose File to Import
-              <input
-                type="file"
-                accept={importType === 'csv' ? '.csv' : '.json'}
-                onChange={handleTaskImport}
-                style={{ display: 'none' }}
-              />
-            </label>
-            
-            {importType === 'csv' && (
-              <button 
-                onClick={downloadTemplate}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  background: '#f3f4f6',
-                  border: 'none',
+          {importStep === 'select' && (
+            <div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px' }}>
+                  Import Format:
+                </label>
+                <select
+                  value={importType}
+                  onChange={(e) => setImportType(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    width: '100%',
+                    marginBottom: '12px'
+                  }}
+                >
+                  <option value="json">JSON (Tasks or Projects)</option>
+                  <option value="csv">CSV (Task List)</option>
+                </select>
+                
+                <label style={{
+                  display: 'block',
+                  padding: '12px 16px',
+                  background: '#10b981',
+                  color: 'white',
                   borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              >
-                📋 Download CSV Template
-              </button>
-            )}
-          </div>
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  marginBottom: '12px'
+                }}>
+                  {isProcessing ? 'Processing...' : '📤 Choose File to Import'}
+                  <input
+                    id="import-file"
+                    type="file"
+                    accept={importType === 'csv' ? '.csv' : '.json'}
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                    disabled={isProcessing}
+                  />
+                </label>
+                
+                {importType === 'csv' && (
+                  <button 
+                    onClick={downloadTemplate}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: '#f3f4f6',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📋 Download CSV Template for Current Project
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {importStep === 'project-choice' && importPreview && (
+            <div>
+              {/* File Preview */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px'
+              }}>
+                <h5 style={{ margin: '0 0 12px 0', fontWeight: '600' }}>📄 File Preview:</h5>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '14px' }}>
+                  <div><strong>{importPreview.taskCount}</strong> tasks</div>
+                  {importPreview.projectCount > 0 && (
+                    <div><strong>{importPreview.projectCount}</strong> projects</div>
+                  )}
+                  <div><strong>{importPreview.fileSize}</strong></div>
+                  <div>Type: <strong>{importPreview.dataType}</strong></div>
+                </div>
+              </div>
+
+              {/* Project Selection */}
+              <div style={{
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px'
+              }}>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '8px' }}>
+                  🎯 Select Target Project:
+                </label>
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    background: 'white',
+                    fontSize: '14px'
+                  }}
+                >
+                  {getProjectsSortedByPriority().map(project => (
+                    <option key={project.id} value={project.id}>
+                      {project.name} ({(project.tasks || []).length} existing tasks)
+                    </option>
+                  ))}
+                </select>
+                <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#92400e' }}>
+                  All {importPreview.taskCount} tasks will be imported to this project
+                </p>
+              </div>
+
+              {/* Import Actions */}
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button 
+                  onClick={resetImport}
+                  style={{
+                    padding: '10px 16px',
+                    background: '#f3f4f6',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleImportToProject}
+                  disabled={!selectedProjectId}
+                  style={{
+                    padding: '10px 16px',
+                    background: selectedProjectId ? '#10b981' : '#9ca3af',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: selectedProjectId ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Import to {projects[selectedProjectId]?.name}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {importStep === 'importing' && (
+            <div style={{ textAlign: 'center', padding: '32px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                border: '3px solid #f3f4f6',
+                borderTop: '3px solid #10b981',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 16px'
+              }}></div>
+              <p>Importing tasks to {projects[selectedProjectId]?.name}...</p>
+            </div>
+          )}
+
+          {importStep === 'success' && importResult && (
+            <div style={{ textAlign: 'center', padding: '32px' }}>
+              {importResult.success ? (
+                <div>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+                  <h5 style={{ color: '#059669', marginBottom: '16px' }}>Import Successful!</h5>
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '20px'
+                  }}>
+                    <p style={{ margin: '0 0 8px 0' }}>
+                      <strong>{importResult.taskCount}</strong> tasks imported to project <strong>{importResult.projectName}</strong>
+                    </p>
+                    {importResult.skippedCount > 0 && (
+                      <p style={{ margin: '0', color: '#d97706' }}>
+                        {importResult.skippedCount} tasks skipped due to errors
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    <button 
+                      onClick={() => {
+                        setCurrentProject(selectedProjectId);
+                        onClose();
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Go to {importResult.projectName}
+                    </button>
+                    <button 
+                      onClick={resetImport}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#f3f4f6',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Import More Files
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '48px', marginBottom: '16px', color: '#ef4444' }}>❌</div>
+                  <h5 style={{ color: '#dc2626', marginBottom: '16px' }}>Import Failed</h5>
+                  <div style={{
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '20px'
+                  }}>
+                    <p style={{ margin: '0', color: '#dc2626' }}>{importResult.error}</p>
+                  </div>
+                  <button 
+                    onClick={resetImport}
+                    style={{
+                      padding: '10px 16px',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           
           <div style={{
             fontSize: '14px',
             color: '#065f46',
             background: '#d1fae5',
             padding: '12px',
-            borderRadius: '6px'
+            borderRadius: '6px',
+            marginTop: '16px'
           }}>
-            <strong>✅ Enhanced Features:</strong>
+            <strong>✅ Project-Based Import Features:</strong>
             <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
-              <li><strong>Duplicate Detection:</strong> Checks task titles for duplicates</li>
-              <li><strong>User Choice:</strong> Skip, duplicate, or replace existing tasks</li>
-              <li><strong>Safe Import:</strong> No accidental overwrites</li>
-              <li><strong>Smart Naming:</strong> Duplicates get date suffix</li>
-              <li><strong>Full Control:</strong> You decide what happens</li>
+              <li><strong>Choose Target:</strong> Select which project to import tasks into</li>
+              <li><strong>File Preview:</strong> See what you're importing before proceeding</li>
+              <li><strong>Duplicate Detection:</strong> Checks for duplicates within the target project</li>
+              <li><strong>Safe Import:</strong> Generates unique IDs to prevent conflicts</li>
+              <li><strong>Smart Categories:</strong> Uses target project's priority categories</li>
             </ul>
           </div>
         </div>
 
-        {/* Task Export Section */}
+        {/* Enhanced Export Section */}
         <div style={{
           border: '2px solid #e5e7eb',
           borderRadius: '8px',
@@ -782,61 +1036,113 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
           background: '#f9fafb',
           marginBottom: '20px'
         }}>
-          <h3 style={{ margin: '0 0 16px 0', color: '#374151' }}>📤 Export Tasks</h3>
+          <h3 style={{ margin: '0 0 16px 0', color: '#374151' }}>📤 Export Options</h3>
           
+          {/* Current Project Export */}
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px' }}>
-              Export Format:
-            </label>
-            <select
-              value={exportType}
-              onChange={(e) => setExportType(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                width: '100%',
-                marginBottom: '12px'
-              }}
-            >
-              <option value="csv">CSV (Excel compatible)</option>
-              <option value="json">JSON</option>
-            </select>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+              Current Project: {getCurrentProject()?.name || 'None'}
+            </h4>
             
-            <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px' }}>
-              Filter Tasks:
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                width: '100%',
-                marginBottom: '12px'
-              }}
-            >
-              <option value="all">All Tasks ({tasks.length})</option>
-              <option value="active">Active Tasks</option>
-              <option value="completed">Completed Tasks</option>
-            </select>
-            
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px' }}>
+                Export Format:
+              </label>
+              <select
+                value={exportType}
+                onChange={(e) => setExportType(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  width: '100%',
+                  marginBottom: '12px'
+                }}
+              >
+                <option value="csv">CSV (Excel compatible)</option>
+                <option value="json">JSON</option>
+              </select>
+              
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px' }}>
+                Filter Tasks:
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  width: '100%',
+                  marginBottom: '12px'
+                }}
+              >
+                <option value="all">All Tasks ({getCurrentProject()?.tasks?.length || 0})</option>
+                <option value="active">Active Tasks</option>
+                <option value="completed">Completed Tasks</option>
+              </select>
+              
+              <button
+                onClick={handleTaskExport}
+                disabled={!getCurrentProject()}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: getCurrentProject() ? '#10b981' : '#9ca3af',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: getCurrentProject() ? 'pointer' : 'not-allowed',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}
+              >
+                📥 Export Current Project
+              </button>
+
+              <button
+                onClick={handleExportCurrentProject}
+                disabled={!getCurrentProject()}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  background: getCurrentProject() ? '#3b82f6' : '#9ca3af',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: getCurrentProject() ? 'pointer' : 'not-allowed',
+                  fontSize: '14px'
+                }}
+              >
+                📦 Export Project Structure (JSON)
+              </button>
+            </div>
+          </div>
+
+          {/* All Projects Export */}
+          <div style={{
+            borderTop: '1px solid #e5e7eb',
+            paddingTop: '16px'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+              All Projects Export
+            </h4>
             <button
-              onClick={handleTaskExport}
+              onClick={handleExportAllProjects}
               style={{
                 width: '100%',
                 padding: '12px 16px',
-                background: '#10b981',
+                background: '#8b5cf6',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                fontSize: '16px',
+                fontSize: '14px',
                 fontWeight: '500'
               }}
             >
-              📥 Export Tasks
+              📁 Export All Projects & Data
             </button>
           </div>
         </div>
@@ -848,7 +1154,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
           padding: '16px',
           background: '#f9fafb'
         }}>
-          <h3 style={{ margin: '0 0 16px 0', color: '#374151' }}>💾 Complete Backup</h3>
+          <h3 style={{ margin: '0 0 16px 0', color: '#374151' }}>💾 Legacy Backup</h3>
           
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
@@ -865,7 +1171,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
                 fontSize: '14px'
               }}
             >
-              📤 Export All Data
+              📤 Export Legacy Format
             </button>
             
             <label style={{
@@ -879,7 +1185,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
               textAlign: 'center',
               fontSize: '14px'
             }}>
-              📥 Import All Data
+              📥 Import Legacy Data
               <input
                 type="file"
                 accept=".json"
@@ -907,6 +1213,14 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
             {toast.message}
           </div>
         )}
+
+        {/* Add CSS for spinner animation */}
+        <style jsx>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
 
       {/* Duplicate Resolution Dialog */}
@@ -944,7 +1258,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
             }}>
               <span style={{ fontSize: '24px', marginRight: '12px' }}>⚠️</span>
               <h3 style={{ margin: 0, color: '#1f2937', fontSize: '18px', fontWeight: '600' }}>
-                Duplicate Tasks Found
+                Duplicate Tasks Found in {projects[duplicateDialog.targetProjectId]?.name}
               </h3>
             </div>
 
@@ -957,7 +1271,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
               marginBottom: '20px'
             }}>
               <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#92400e' }}>
-                Found {duplicateDialog.duplicates.length} duplicate task(s):
+                Found {duplicateDialog.duplicates.length} duplicate task(s) in this project:
               </p>
               <div style={{
                 maxHeight: '150px',
@@ -1023,7 +1337,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
                 <div>
                   <div style={{ fontWeight: '600' }}>Skip Duplicates</div>
                   <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                    Don't import duplicate tasks, keep existing ones
+                    Don't import duplicate tasks, keep existing ones in {projects[duplicateDialog.targetProjectId]?.name}
                   </div>
                 </div>
               </button>
@@ -1049,7 +1363,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
                 <div>
                   <div style={{ fontWeight: '600' }}>Import as Duplicates</div>
                   <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                    Import with unique IDs and date suffix (e.g., "Task Name (Import 7/2/2025)")
+                    Import with unique IDs and date suffix (e.g., "Task Name (Import {new Date().toLocaleDateString()})")
                   </div>
                 </div>
               </button>
@@ -1075,7 +1389,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
                 <div>
                   <div style={{ fontWeight: '600' }}>Replace Existing</div>
                   <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                    Replace existing tasks with imported data (ensures unique IDs)
+                    Replace existing tasks in {projects[duplicateDialog.targetProjectId]?.name} with imported data
                   </div>
                 </div>
               </button>
@@ -1090,7 +1404,7 @@ Ready: {!!(projects && currentProjectId && setTasks) ? '✅' : '❌'}        </d
               fontSize: '12px',
               color: '#6b7280'
             }}>
-              <strong>Note:</strong> {duplicateDialog.newTasks.length} unique tasks will be imported regardless of your choice.
+              <strong>Note:</strong> {duplicateDialog.newTasks?.length || 0} unique tasks will be imported to {projects[duplicateDialog.targetProjectId]?.name} regardless of your choice.
             </div>
           </div>
         </div>
