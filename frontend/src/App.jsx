@@ -6,7 +6,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
 import SettingsModal from './components/modals/SettingsModal';
-
+import generateUniqueId from './utils/idGenerator';
 
 // Enhanced Autosave Indicator Component - FIXED
 const AutosaveIndicator = () => {

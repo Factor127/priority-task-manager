@@ -1,3 +1,6 @@
+// frontend/src/utils/idGenerator.js
+// Create this file to fix the generateUniqueId undefined errors
+
 let idCounter = 0;
 
 export const generateUniqueId = () => {
@@ -15,5 +18,5 @@ export const generateCryptoId = () => {
   return generateUniqueId();
 };
 
-// Use this in your task creation code instead of just Date.now()
+// Export as default
 export default generateUniqueId;

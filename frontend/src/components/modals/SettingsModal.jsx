@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Upload, RotateCcw, Settings } from 'lucide-react';
 import styles from './SettingsModal.module.css';
+import generateUniqueId from '../../utils/idGenerator';
 
 const SettingsModal = ({ 
   isOpen, 
