@@ -1,8 +1,14 @@
-// SettingsModal.jsx - Complete Implementation
+// SettingsModal.jsx - Fixed syntax while keeping all functions
 import React, { useState, useEffect } from 'react';
-import { X, Download, Upload, RotateCcw, Settings } from 'lucide-react';
-import styles from './SettingsModal.module.css';
 import generateUniqueId from '../../utils/idGenerator';
+
+// Simple icon components
+const X = () => <span>✕</span>;
+const Download = () => <span>📤</span>;
+const Upload = () => <span>📥</span>;
+const RotateCcw = () => <span>🔄</span>;
+const Save = () => <span>💾</span>;
+const AlertCircle = () => <span>⚠️</span>;
 
 const SettingsModal = ({ 
   isOpen, 
@@ -24,7 +30,7 @@ const SettingsModal = ({
   });
   const [hasChanges, setHasChanges] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
-  const [showDataCleanup, setShowDataCleanup] = useState(false);
+
   // Default color palette
   const colorPalette = [
     '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', 
@@ -146,7 +152,12 @@ This action cannot be undone. Are you sure?`;
     }
   };
 
-  if (!isOpen) return null;
+  // Calculate total weight
+  const totalWeight = categories.reduce((sum, cat) => sum + cat.weight, 0);
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div style={{
@@ -195,7 +206,7 @@ This action cannot be undone. Are you sure?`;
               padding: '4px'
             }}
           >
-            ✕
+            <X />
           </button>
         </div>
 
@@ -271,7 +282,7 @@ This action cannot be undone. Are you sure?`;
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ margin: '0 0 8px 0', color: '#1f2937' }}>Priority Categories</h3>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  Customize the categories used for priority scoring. Total weight: {categories.reduce((sum, cat) => sum + cat.weight, 0)}%
+                  Customize the categories used for priority scoring. Total weight: {totalWeight}%
                 </p>
               </div>
 
@@ -516,7 +527,7 @@ This action cannot be undone. Are you sure?`;
                     fontSize: '14px'
                   }}
                 >
-                  🔄 Reset to Defaults
+                  <RotateCcw /> Reset to Defaults
                 </button>
                 <button
                   onClick={handleSaveChanges}
@@ -532,7 +543,7 @@ This action cannot be undone. Are you sure?`;
                     fontWeight: '500'
                   }}
                 >
-                  💾 Save Changes
+                  <Save /> Save Changes
                 </button>
               </div>
             </div>
@@ -556,7 +567,7 @@ This action cannot be undone. Are you sure?`;
                 marginBottom: '20px',
                 backgroundColor: '#f9fafb'
               }}>
-                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>📤 Export Data</h4>
+                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}><Download /> Export Data</h4>
                 <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>
                   Download a complete backup of all your tasks, categories, and settings.
                 </p>
@@ -573,7 +584,7 @@ This action cannot be undone. Are you sure?`;
                     fontWeight: '500'
                   }}
                 >
-                  📥 Download Backup
+                  <Download /> Download Backup
                 </button>
               </div>
 
@@ -585,7 +596,7 @@ This action cannot be undone. Are you sure?`;
                 marginBottom: '20px',
                 backgroundColor: '#f9fafb'
               }}>
-                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>📥 Import Data</h4>
+                <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}><Upload /> Import Data</h4>
                 <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>
                   Restore data from a previously exported backup file.
                 </p>
@@ -611,7 +622,7 @@ This action cannot be undone. Are you sure?`;
                 borderRadius: '8px',
                 backgroundColor: '#fef2f2'
               }}>
-                <h4 style={{ margin: '0 0 12px 0', color: '#dc2626' }}>⚠️ Reset All Data</h4>
+                <h4 style={{ margin: '0 0 12px 0', color: '#dc2626' }}><AlertCircle /> Reset All Data</h4>
                 <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>
                   Permanently delete all tasks, categories, and settings. This action cannot be undone.
                 </p>
@@ -755,23 +766,51 @@ This action cannot be undone. Are you sure?`;
           alignItems: 'center'
         }}>
           <div style={{ fontSize: '12px', color: '#6b7280' }}>
-            Priority Task Manager v2.0
+            {hasChanges && (
+              <span style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle />
+                You have unsaved changes
+              </span>
+            )}
           </div>
-          <button
-            onClick={handleClose}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#374151',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            Close
-          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={handleClose}
+              style={{
+                background: '#f3f4f6',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                padding: '10px 20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              Cancel
+            </button>
+            {hasChanges && (
+              <button
+                onClick={handleSaveChanges}
+                style={{
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Save />
+                Save Changes
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
