@@ -1,5 +1,6 @@
 // SettingsModal.jsx - Complete Implementation
 import React, { useState, useEffect } from 'react';
+import DataCleanup from '../../utils/DataCleanup';
 
 const SettingsModal = ({ 
   isOpen, 
@@ -21,7 +22,7 @@ const SettingsModal = ({
   });
   const [hasChanges, setHasChanges] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
-
+  const [showDataCleanup, setShowDataCleanup] = useState(false);
   // Default color palette
   const colorPalette = [
     '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', 
