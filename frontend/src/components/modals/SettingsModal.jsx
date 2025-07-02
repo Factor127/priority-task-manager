@@ -1,6 +1,7 @@
 // SettingsModal.jsx - Complete Implementation
 import React, { useState, useEffect } from 'react';
-import DataCleanup from '../../utils/DataCleanup';
+import { X, Download, Upload, RotateCcw, Settings } from 'lucide-react';
+import styles from './SettingsModal.module.css';
 
 const SettingsModal = ({ 
   isOpen, 
@@ -60,7 +61,7 @@ const SettingsModal = ({
   const handleAddCategory = () => {
     if (newCategory.english.trim()) {
       const category = {
-        id: Date.now().toString(),
+        id: generateUniqueId().toString(),
         english: newCategory.english.trim(),
         hebrew: newCategory.hebrew.trim() || newCategory.english.trim(),
         weight: Math.max(0, Math.min(100, newCategory.weight)),

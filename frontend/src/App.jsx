@@ -6,7 +6,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
 import SettingsModal from './components/modals/SettingsModal';
-import DataCleanup from './utils/DataCleanup';
+
 
 // Enhanced Autosave Indicator Component - FIXED
 const AutosaveIndicator = () => {
@@ -22,7 +22,6 @@ const AutosaveIndicator = () => {
   
   // Use context value or fallback to IDLE
   const overallSaveState = context?.overallSaveState || AUTOSAVE_STATES.IDLE;
-  const [showDataCleanup, setShowDataCleanup] = useState(false);
   const getIndicatorContent = () => {
     switch (overallSaveState) {
       case AUTOSAVE_STATES.SAVING:
@@ -636,7 +635,7 @@ const PriorityTaskManager = () => {
       } else {
         const newTask = {
           ...processedData,
-          id: Date.now(),
+          id: generateUniqueId(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };

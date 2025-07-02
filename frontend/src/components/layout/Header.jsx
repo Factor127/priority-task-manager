@@ -77,10 +77,10 @@ const AutosaveIndicator = ({ overallSaveState, AUTOSAVE_STATES }) => {
 
 const Header = ({ level, points, saveState, onCreateTask, onShowFiles, onShowSettings, onForceSave, overallSaveState, AUTOSAVE_STATES }) => {
     // Generate unique IDs for buttons
-    const createTaskBtnId = `create-task-${Date.now()}`;
-const filesBtnId = `files-${Date.now()}`;
-const settingsBtnId = `settings-${Date.now()}`;
-const saveBtnId = `save-${Date.now()}`;
+    const createTaskBtnId = `create-task-${generateUniqueId()}`;
+const filesBtnId = `files-${generateUniqueId()}`;
+const settingsBtnId = `settings-${generateUniqueId()}`;
+const saveBtnId = `save-${generateUniqueId()}`;
 
     const headerStyle = {
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
