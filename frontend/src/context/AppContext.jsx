@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import apiService from '../services/api';
 
 // =================
 // CONSTANTS
@@ -11,14 +12,15 @@ const AUTOSAVE_STATES = {
     ERROR: 'error'
 };
 
+// Updated to match backend default categories
 const DEFAULT_PRIORITY_CATEGORIES = [
-    { id: 'income', english: 'Income/Revenue', hebrew: 'הכנסה לשוטף', weight: 40, color: '#10B981' },
-    { id: 'home', english: 'Home Management', hebrew: 'ניהול בית', weight: 15, color: '#3B82F6' },
-    { id: 'plan', english: '5-Year Plan', hebrew: 'תוכנית חומש', weight: 5, color: '#8B5CF6' },
-    { id: 'social', english: 'Social', hebrew: 'סוציאל', weight: 20, color: '#F59E0B' },
-    { id: 'relationship', english: 'Relationship', hebrew: 'זוגיות', weight: 5, color: '#EF4444' },
-    { id: 'personal', english: 'Personal', hebrew: 'עצמי', weight: 20, color: '#06B6D4' },
-    { id: 'children', english: 'Children', hebrew: 'ילדים', weight: 30, color: '#84CC16' }
+    { id: 'impact', english: 'Impact', hebrew: 'השפעה', weight: 25, color: '#FF6B6B' },
+    { id: 'urgency', english: 'Urgency', hebrew: 'דחיפות', weight: 20, color: '#4ECDC4' },
+    { id: 'effort', english: 'Effort Required', hebrew: 'מאמץ נדרש', weight: 15, color: '#45B7D1' },
+    { id: 'alignment', english: 'Goal Alignment', hebrew: 'התאמה למטרות', weight: 15, color: '#96CEB4' },
+    { id: 'learning', english: 'Learning Value', hebrew: 'ערך לימודי', weight: 10, color: '#FFEAA7' },
+    { id: 'enjoyment', english: 'Enjoyment', hebrew: 'הנאה', weight: 10, color: '#DDA0DD' },
+    { id: 'risk', english: 'Risk Level', hebrew: 'רמת סיכון', weight: 5, color: '#FFB6C1' }
 ];
 
 const DEFAULT_PROJECTS = [
@@ -49,17 +51,24 @@ export const useApp = () => {
 // =================
 
 export const AppProvider = ({ children }) => {
-    // Multi-project state
+    // Multi-project state (existing)
     const [projects, setProjects] = useState({});
     const [currentProjectId, setCurrentProjectId] = useState('default');
     const [overallSaveState, setOverallSaveState] = useState(AUTOSAVE_STATES.IDLE);
     
-    // Refs for auto-save
+    // NEW: API integration state
+    const [apiStatus, setApiStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
+    const [isOnline, setIsOnline] = useState(true);
+    const [syncMode, setSyncMode] = useState('localStorage'); // 'localStorage', 'api', 'hybrid'
+    const [lastApiSync, setLastApiSync] = useState(null);
+    const [apiError, setApiError] = useState(null);
+    
+    // Refs for auto-save (existing)
     const saveTimeoutRef = useRef(null);
     const lastSaveRef = useRef(Date.now());
 
     // =================
-    // UTILITY FUNCTIONS
+    // UTILITY FUNCTIONS (existing + enhanced)
     // =================
 
     const saveToLocalStorage = useCallback((key, value) => {
@@ -90,34 +99,152 @@ export const AppProvider = ({ children }) => {
         }
     }, []);
 
+    // NEW: API utility functions
+    const handleApiError = useCallback((error) => {
+        console.error('API Error:', error);
+        setApiError(error.message);
+        setApiStatus('error');
+        
+        // If it's a network error, switch to offline mode
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+            setIsOnline(false);
+            setSyncMode('localStorage');
+        }
+    }, []);
+
+    const clearApiError = useCallback(() => {
+        setApiError(null);
+        setApiStatus('idle');
+    }, []);
+
     // =================
-    // INITIALIZE DATA
+    // API OPERATIONS
+    // =================
+
+    const testApiConnection = useCallback(async () => {
+        try {
+            setApiStatus('loading');
+            await apiService.healthCheck();
+            setIsOnline(true);
+            setApiStatus('success');
+            setSyncMode('api');
+            return true;
+        } catch (error) {
+            handleApiError(error);
+            return false;
+        }
+    }, [handleApiError]);
+
+    const syncWithApi = useCallback(async () => {
+        if (!isOnline) return false;
+        
+        try {
+            setApiStatus('loading');
+            
+            // Load categories and tasks from API
+            const [categoriesResponse, tasksResponse] = await Promise.all([
+                apiService.getCategories(),
+                apiService.getTasks()
+            ]);
+
+            // Update current project with API data
+            const currentProj = projects[currentProjectId];
+            if (currentProj) {
+                updateProject(currentProjectId, {
+                    tasks: tasksResponse.tasks || [],
+                    priorityCategories: categoriesResponse.categories || DEFAULT_PRIORITY_CATEGORIES
+                });
+            }
+
+            setLastApiSync(new Date().toISOString());
+            setApiStatus('success');
+            setSyncMode('api');
+            return true;
+        } catch (error) {
+            handleApiError(error);
+            return false;
+        }
+    }, [isOnline, projects, currentProjectId]);
+
+    const pushToApi = useCallback(async (task) => {
+        if (!isOnline || syncMode === 'localStorage') return null;
+        
+        try {
+            const result = await apiService.createTask(task);
+            return result;
+        } catch (error) {
+            handleApiError(error);
+            return null;
+        }
+    }, [isOnline, syncMode, handleApiError]);
+
+    const updateTaskOnApi = useCallback(async (taskId, taskData) => {
+        if (!isOnline || syncMode === 'localStorage') return null;
+        
+        try {
+            const result = await apiService.updateTask(taskId, taskData);
+            return result;
+        } catch (error) {
+            handleApiError(error);
+            return null;
+        }
+    }, [isOnline, syncMode, handleApiError]);
+
+    const deleteTaskOnApi = useCallback(async (taskId) => {
+        if (!isOnline || syncMode === 'localStorage') return null;
+        
+        try {
+            await apiService.deleteTask(taskId);
+            return true;
+        } catch (error) {
+            handleApiError(error);
+            return null;
+        }
+    }, [isOnline, syncMode, handleApiError]);
+
+    // =================
+    // INITIALIZE DATA (enhanced)
     // =================
 
     useEffect(() => {
-        const loadedProjects = loadFromLocalStorage('multiProjects', {});
-        const loadedCurrentProjectId = loadFromLocalStorage('currentProject', 'default');
-        
-        // Initialize default project if none exists
-        if (Object.keys(loadedProjects).length === 0) {
-            const defaultProject = {
-                id: 'default',
-                name: 'Default Project',
-                tasks: [],
-                priorityCategories: DEFAULT_PRIORITY_CATEGORIES,
-                savedProjects: DEFAULT_PROJECTS,
-                createdAt: new Date().toISOString()
-            };
-            setProjects({ default: defaultProject });
-            setCurrentProjectId('default');
-        } else {
-            setProjects(loadedProjects);
-            setCurrentProjectId(loadedCurrentProjectId);
-        }
-    }, [loadFromLocalStorage]);
+        const initializeApp = async () => {
+            // Load from localStorage first (existing logic)
+            const loadedProjects = loadFromLocalStorage('multiProjects', {});
+            const loadedCurrentProjectId = loadFromLocalStorage('currentProject', 'default');
+            
+            // Initialize default project if none exists
+            if (Object.keys(loadedProjects).length === 0) {
+                const defaultProject = {
+                    id: 'default',
+                    name: 'Default Project',
+                    tasks: [],
+                    priorityCategories: DEFAULT_PRIORITY_CATEGORIES,
+                    savedProjects: DEFAULT_PROJECTS,
+                    createdAt: new Date().toISOString()
+                };
+                setProjects({ default: defaultProject });
+                setCurrentProjectId('default');
+            } else {
+                setProjects(loadedProjects);
+                setCurrentProjectId(loadedCurrentProjectId);
+            }
+
+            // NEW: Try to connect to API
+            const apiConnected = await testApiConnection();
+            if (apiConnected) {
+                console.log('✅ Connected to API - Cloud sync available');
+                // Optional: sync data on startup
+                // await syncWithApi();
+            } else {
+                console.log('📱 Running in offline mode - Using localStorage');
+            }
+        };
+
+        initializeApp();
+    }, [loadFromLocalStorage, testApiConnection]);
 
     // =================
-    // AUTO-SAVE LOGIC
+    // AUTO-SAVE LOGIC (enhanced)
     // =================
 
     const scheduleAutoSave = useCallback(() => {
@@ -127,14 +254,21 @@ export const AppProvider = ({ children }) => {
         
         setOverallSaveState(AUTOSAVE_STATES.SAVING);
         
-        saveTimeoutRef.current = setTimeout(() => {
+        saveTimeoutRef.current = setTimeout(async () => {
             try {
+                // Always save to localStorage
                 const success1 = saveToLocalStorage('multiProjects', projects);
                 const success2 = saveToLocalStorage('currentProject', currentProjectId);
                 
                 if (success1 && success2) {
                     setOverallSaveState(AUTOSAVE_STATES.SAVED);
                     lastSaveRef.current = Date.now();
+                    
+                    // NEW: If online and in API mode, also sync to API
+                    if (isOnline && syncMode === 'api') {
+                        // Note: This is a basic sync - in production you'd want more sophisticated logic
+                        console.log('💾 Saved locally + API sync available');
+                    }
                     
                     setTimeout(() => {
                         setOverallSaveState(AUTOSAVE_STATES.IDLE);
@@ -147,9 +281,9 @@ export const AppProvider = ({ children }) => {
                 setOverallSaveState(AUTOSAVE_STATES.ERROR);
             }
         }, 800);
-    }, [projects, currentProjectId, saveToLocalStorage]);
+    }, [projects, currentProjectId, saveToLocalStorage, isOnline, syncMode]);
 
-    // Trigger auto-save when projects change
+    // Trigger auto-save when projects change (existing)
     useEffect(() => {
         if (Object.keys(projects).length > 0) {
             scheduleAutoSave();
@@ -157,7 +291,7 @@ export const AppProvider = ({ children }) => {
     }, [projects, scheduleAutoSave]);
 
     // =================
-    // DERIVED STATE
+    // DERIVED STATE (existing)
     // =================
 
     const currentProject = projects[currentProjectId] || null;
@@ -166,7 +300,7 @@ export const AppProvider = ({ children }) => {
     const savedProjects = currentProject?.savedProjects || DEFAULT_PROJECTS;
 
     // =================
-    // PROJECT MANAGEMENT
+    // PROJECT MANAGEMENT (existing)
     // =================
 
     const updateProject = useCallback((projectId, updates) => {
@@ -224,7 +358,7 @@ export const AppProvider = ({ children }) => {
     }, [projects]);
 
     // =================
-    // CURRENT PROJECT OPERATIONS
+    // CURRENT PROJECT OPERATIONS (existing)
     // =================
 
     const setTasks = useCallback((newTasks) => {
@@ -264,7 +398,7 @@ export const AppProvider = ({ children }) => {
     }, [currentProjectId, savedProjects, updateProject]);
 
     // =================
-    // DATA EXPORT/IMPORT
+    // DATA EXPORT/IMPORT (existing + enhanced)
     // =================
 
     const exportAllData = useCallback(() => {
@@ -273,7 +407,9 @@ export const AppProvider = ({ children }) => {
                 projects,
                 currentProjectId,
                 exportedAt: new Date().toISOString(),
-                version: '1.0'
+                version: '1.0',
+                syncMode,
+                lastApiSync
             };
             
             const dataStr = JSON.stringify(exportData, null, 2);
@@ -293,7 +429,7 @@ export const AppProvider = ({ children }) => {
             console.error('Export failed:', error);
             throw new Error('Export failed: ' + error.message);
         }
-    }, [projects, currentProjectId]);
+    }, [projects, currentProjectId, syncMode, lastApiSync]);
 
     const importAllData = useCallback((importData) => {
         try {
@@ -319,8 +455,40 @@ export const AppProvider = ({ children }) => {
         }
     }, [currentProjectId, priorityCategories, savedProjects, updateProject]);
 
+    // NEW: Cloud migration
+    const migrateToCloud = useCallback(async () => {
+        if (!isOnline) {
+            throw new Error('Cannot migrate to cloud - offline');
+        }
+
+        try {
+            setApiStatus('loading');
+            
+            // Prepare localStorage data for migration
+            const localStorageData = {
+                tasks: JSON.stringify(tasks),
+                priorityCategories: JSON.stringify(priorityCategories),
+                userProgress: localStorage.getItem('userProgress')
+            };
+
+            const result = await apiService.migrateFromLocalStorage(localStorageData);
+            
+            if (result.success) {
+                setSyncMode('api');
+                setLastApiSync(new Date().toISOString());
+                setApiStatus('success');
+                return { success: true, message: 'Migration completed successfully!' };
+            } else {
+                throw new Error('Migration failed');
+            }
+        } catch (error) {
+            handleApiError(error);
+            return { success: false, error: error.message };
+        }
+    }, [isOnline, tasks, priorityCategories, handleApiError]);
+
     // =================
-    // FORCE SAVE
+    // FORCE SAVE (existing)
     // =================
 
     const forceSave = useCallback(() => {
@@ -351,7 +519,7 @@ export const AppProvider = ({ children }) => {
     }, [projects, currentProjectId, saveToLocalStorage]);
 
     // =================
-    // CLEANUP
+    // CLEANUP (existing)
     // =================
 
     useEffect(() => {
@@ -363,40 +531,58 @@ export const AppProvider = ({ children }) => {
     }, []);
 
     // =================
-    // CONTEXT VALUE
+    // CONTEXT VALUE (enhanced)
     // =================
 
     const contextValue = useMemo(() => ({
-        // Multi-project state
+        // Multi-project state (existing)
         projects,
         currentProjectId,
         currentProject,
         
-        // Current project data (for backward compatibility)
+        // Current project data (existing - for backward compatibility)
         tasks,
         priorityCategories,
         savedProjects,
         
-        // Project management
+        // Project management (existing)
         createProject,
         deleteProject,
         updateProject,
         switchProject,
         
-        // Current project operations  
+        // Current project operations (existing)
         setTasks,
         setPriorityCategories,
         setSavedProjects,
         
-        // Auto-save
+        // Auto-save (existing)
         overallSaveState,
         forceSave,
         AUTOSAVE_STATES,
         
-        // Export/Import
+        // Export/Import (existing)
         exportAllData,
-        importAllData
+        importAllData,
+        
+        // NEW: API integration
+        apiStatus,
+        isOnline,
+        syncMode,
+        lastApiSync,
+        apiError,
+        clearApiError,
+        testApiConnection,
+        syncWithApi,
+        migrateToCloud,
+        pushToApi,
+        updateTaskOnApi,
+        deleteTaskOnApi,
+        
+        // Direct API access
+        apiService
     }), [
+        // Existing dependencies
         projects,
         currentProjectId,
         currentProject,
@@ -413,7 +599,20 @@ export const AppProvider = ({ children }) => {
         overallSaveState,
         forceSave,
         exportAllData,
-        importAllData
+        importAllData,
+        // New dependencies
+        apiStatus,
+        isOnline,
+        syncMode,
+        lastApiSync,
+        apiError,
+        clearApiError,
+        testApiConnection,
+        syncWithApi,
+        migrateToCloud,
+        pushToApi,
+        updateTaskOnApi,
+        deleteTaskOnApi
     ]);
 
     return (
