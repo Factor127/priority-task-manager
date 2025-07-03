@@ -10,6 +10,8 @@ import TaskForm from './components/modals/TaskForm';
 import FileManager from './components/modals/FileManager';
 import SettingsModal from './components/modals/SettingsModal';
 import generateUniqueId from './utils/idGenerator';
+import ConnectionStatus from './components/ConnectionStatus';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 // NEW: Project-related imports
