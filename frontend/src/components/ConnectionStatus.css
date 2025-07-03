@@ -1,0 +1,71 @@
+/* frontend/src/components/ConnectionStatus.css */
+.connection-status {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: white;
+  text-align: center;
+}
+
+.status-loading {
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  animation: pulse 2s ease-in-out infinite alternate;
+}
+
+.status-offline {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.status-error {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.status-migration {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.sync-button,
+.migrate-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sync-button:hover,
+.migrate-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.sync-button:active,
+.migrate-button:active {
+  transform: translateY(0);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
+}
